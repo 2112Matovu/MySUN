@@ -52,5 +52,9 @@ class Announcement {
         'expires_at': expiresAt?.toIso8601String(),
       };
 
+  /// True once [expiresAt] has passed — this is what drops it out of the
+  /// feed. `null` means it never expires.
+  bool get isExpired => expiresAt != null && expiresAt!.isBefore(DateTime.now());
+
   String get bookmarkKey => 'announcement:$id';
 }

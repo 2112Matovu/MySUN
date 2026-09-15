@@ -29,7 +29,7 @@ def create_announcement(
 ) -> dict:
     """Publishes immediately — no pre-approval gate (§5.1). An admin can
     still remove it later; see POST /admin/moderation/{submission_id}/remove."""
-    payload = body.model_dump(exclude={"draft_id", "department"})
+    payload = body.model_dump(mode="json", exclude={"draft_id", "department"})
     payload["publisher_name"] = user.faculty or body.department or user.name
     created = repo.create(payload)
     record_publish(

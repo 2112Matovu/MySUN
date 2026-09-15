@@ -41,7 +41,7 @@ class MockAnnouncementRepository implements AnnouncementRepository {
     int offset = 0,
   }) async {
     await Future<void>.delayed(AppConstants.mockLatency);
-    var items = _sorted;
+    var items = _sorted.where((a) => !a.isExpired).toList();
     if (category != null && category != 'All') {
       items = items.where((a) => a.category == category).toList();
     }
@@ -90,6 +90,7 @@ class MockAnnouncementRepository implements AnnouncementRepository {
       publishedAt: DateTime.now(),
       isImportant: announcement.isImportant,
       imageUrl: announcement.imageUrl,
+      expiresAt: announcement.expiresAt,
     );
     _announcements.insert(0, saved);
     return saved;
@@ -106,24 +107,32 @@ class HttpAnnouncementRepository implements AnnouncementRepository {
   HttpAnnouncementRepository(this._dio);
   final Dio _dio;
 
+  /// Unfiltered fetch (including expired ones) — [byIds] and [search] use
+  /// this directly so a bookmarked or matched announcement doesn't vanish
+  /// just because it expired, same as how past events still show up there.
+  Future<List<Announcement>> _all({String? category}) async {
+    try {
+      final res = await _dio.get('/announcements', queryParameters: {
+        if (category != null && category != 'All') 'category': category,
+      });
+      return (res.data as List)
+          .map((e) => Announcement.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
   @override
   Future<List<Announcement>> list({
     String? category,
     int limit = AppConstants.pageSize,
     int offset = 0,
   }) async {
-    try {
-      final res = await _dio.get('/announcements', queryParameters: {
-        if (category != null && category != 'All') 'category': category,
-      });
-      final items = (res.data as List)
-          .map((e) => Announcement.fromJson(e as Map<String, dynamic>))
-          .toList();
-      if (offset >= items.length) return const [];
-      return items.sublist(offset, (offset + limit).clamp(0, items.length));
-    } on DioException catch (e) {
-      throw mapDioError(e);
-    }
+    final items =
+        (await _all(category: category)).where((a) => !a.isExpired).toList();
+    if (offset >= items.length) return const [];
+    return items.sublist(offset, (offset + limit).clamp(0, items.length));
   }
 
   @override
@@ -139,7 +148,7 @@ class HttpAnnouncementRepository implements AnnouncementRepository {
   @override
   Future<List<Announcement>> byIds(Set<String> ids) async {
     if (ids.isEmpty) return const [];
-    final all = await list(limit: 1000);
+    final all = await _all();
     return all.where((a) => ids.contains(a.id)).toList();
   }
 
@@ -147,7 +156,7 @@ class HttpAnnouncementRepository implements AnnouncementRepository {
   Future<List<Announcement>> search(String query) async {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return const [];
-    final all = await list(limit: 1000);
+    final all = await _all();
     return all
         .where((a) =>
             a.title.toLowerCase().contains(q) ||

@@ -45,16 +45,62 @@ class _CreateAnnouncementScreenState
       _form?['department'] as String? ?? _departments.first;
   late String _category = _form?['category'] as String? ??
       announcementCategories.firstWhere((c) => c != 'All');
+  late bool _hasExpiry = _form?['expiryDate'] != null;
+  late DateTime? _expiryDate = _form?['expiryDate'] == null
+      ? null
+      : DateTime.parse(_form!['expiryDate'] as String);
+  late TimeOfDay? _expiryTime = _form?['expiryHour'] == null
+      ? null
+      : TimeOfDay(
+          hour: _form!['expiryHour'] as int,
+          minute: _form!['expiryMinute'] as int);
   bool _saving = false;
 
   Map<String, dynamic>? get _form => widget.draft?.formData;
+
+  /// Defaults to end-of-day when a date is picked but no specific time is.
+  DateTime? get _expiresAt {
+    if (!_hasExpiry || _expiryDate == null) return null;
+    final t = _expiryTime ?? const TimeOfDay(hour: 23, minute: 59);
+    return DateTime(_expiryDate!.year, _expiryDate!.month, _expiryDate!.day,
+        t.hour, t.minute);
+  }
 
   Map<String, dynamic> _buildFormData() => {
         'title': _title.text,
         'content': _content.text,
         'department': _department,
         'category': _category,
+        'expiryDate': _hasExpiry ? _expiryDate?.toIso8601String() : null,
+        'expiryHour': _hasExpiry ? _expiryTime?.hour : null,
+        'expiryMinute': _hasExpiry ? _expiryTime?.minute : null,
       };
+
+  Future<void> _pickExpiryDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _expiryDate ?? now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _expiryDate = picked);
+  }
+
+  Future<void> _pickExpiryTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _expiryTime ?? const TimeOfDay(hour: 23, minute: 59),
+    );
+    if (picked != null) setState(() => _expiryTime = picked);
+  }
+
+  String _fmtExpiryDate() => _expiryDate == null
+      ? 'Select date'
+      : '${_expiryDate!.day}/${_expiryDate!.month}/${_expiryDate!.year}';
+
+  String _fmtExpiryTime() =>
+      _expiryTime == null ? 'End of day' : _expiryTime!.format(context);
 
   @override
   void dispose() {
@@ -65,6 +111,12 @@ class _CreateAnnouncementScreenState
 
   Future<void> _save({required bool submit}) async {
     if (!_formKey.currentState!.validate()) return;
+    if (submit && _hasExpiry && _expiryDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick an expiry date, or turn expiry off')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     final publisherRepo = ref.read(publisherRepositoryProvider);
     try {
@@ -78,6 +130,7 @@ class _CreateAnnouncementScreenState
                 category: _category,
                 publisherName: user.faculty ?? _department,
                 publishedAt: DateTime.now(),
+                expiresAt: _expiresAt,
               ),
             );
         await publisherRepo.publish(
@@ -159,6 +212,43 @@ class _CreateAnnouncementScreenState
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Set an expiry'),
+                subtitle: const Text(
+                    'Automatically removed from the feed after this time'),
+                value: _hasExpiry,
+                onChanged: (v) => setState(() {
+                  _hasExpiry = v;
+                  if (!v) {
+                    _expiryDate = null;
+                    _expiryTime = null;
+                  }
+                }),
+              ),
+              if (_hasExpiry) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickExpiryDate,
+                        icon: const Icon(Icons.event_busy_outlined),
+                        label: Text('Expires: ${_fmtExpiryDate()}'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickExpiryTime,
+                        icon: const Icon(Icons.schedule_outlined),
+                        label: Text(_fmtExpiryTime()),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 14),
               OutlinedButton.icon(
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(

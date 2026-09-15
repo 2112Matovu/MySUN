@@ -26,7 +26,7 @@ def get_event(id: str) -> dict:
 @router.post("", response_model=Event)
 def create_event(body: EventCreate, user: UserProfile = Depends(require_publisher)) -> dict:
     """Publishes immediately — no pre-approval gate (§5.1)."""
-    payload = body.model_dump(exclude={"draft_id"})
+    payload = body.model_dump(mode="json", exclude={"draft_id"})
     created = repo.create(payload)
     record_publish(
         publisher_id=user.id,

@@ -26,7 +26,7 @@ def create_accommodation(
 ) -> dict:
     """Publishes immediately, unverified/gazetted status as submitted — an
     admin can still remove it later (§5.1)."""
-    payload = body.model_dump(exclude={"draft_id"})
+    payload = body.model_dump(mode="json", exclude={"draft_id"})
     payload["publisher_name"] = user.faculty or user.name
     created = repo.create(payload)
     record_publish(

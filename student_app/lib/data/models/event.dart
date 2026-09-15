@@ -60,7 +60,11 @@ class Event {
         'is_featured': isFeatured,
       };
 
-  bool get isPast => dateTime.isBefore(DateTime.now());
+  /// True once the event's end time has passed (or its start time, for
+  /// events with no end time set) — this is what drops it out of the
+  /// Events list, not the start time alone, so it stays visible for its
+  /// whole duration.
+  bool get isPast => (endDateTime ?? dateTime).isBefore(DateTime.now());
   bool get isToday {
     final now = DateTime.now();
     return dateTime.year == now.year &&

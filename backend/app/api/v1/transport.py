@@ -45,7 +45,7 @@ def create_provider(
     body: TransportProviderCreate, user: UserProfile = Depends(require_publisher)
 ) -> dict:
     """Publishes immediately, unverified until an admin reviews it (§5.1)."""
-    payload = body.model_dump(exclude={"draft_id"})
+    payload = body.model_dump(mode="json", exclude={"draft_id"})
     payload["service_type"] = "boda"
     created = repo.create(payload)
     record_publish(

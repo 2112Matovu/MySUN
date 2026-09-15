@@ -30,6 +30,13 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    """The Google-issued ID token from the Flutter app's `google_sign_in`
+    call, exchanged server-side for a Supabase session."""
+
+    id_token: str
+
+
 class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str | None = None

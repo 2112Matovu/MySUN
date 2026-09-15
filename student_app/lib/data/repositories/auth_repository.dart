@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import 'package:mysun_app/core/constants/app_constants.dart';
 import 'package:mysun_app/core/network/api_exception.dart';
+import 'package:mysun_app/core/network/google_auth_service.dart';
 import 'package:mysun_app/core/network/token_storage.dart';
 import 'package:mysun_app/data/models/user_profile.dart';
 import 'package:mysun_app/data/models/user_role.dart';
@@ -28,6 +29,11 @@ abstract class AuthRepository {
   });
 
   Future<void> requestPasswordReset(String email);
+
+  /// Signs in with Google (native/web picker via `google_sign_in`), then
+  /// exchanges the ID token for a session via `POST /auth/google`. Returns
+  /// `null` if the user cancelled the Google picker rather than throwing.
+  Future<UserProfile?> loginWithGoogle();
 
   /// Clears anything the repository holds locally (e.g. tokens). A no-op
   /// for the mock — [AuthNotifier] handles its own local state regardless.
@@ -118,6 +124,12 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<UserProfile?> loginWithGoogle() async {
+    await Future.delayed(AppConstants.mockLatency);
+    return _accounts['student@mysun.ug']!.profile;
+  }
+
+  @override
   Future<void> logout() async {}
 }
 
@@ -182,5 +194,20 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> logout() => _tokenStorage.clear();
+  Future<UserProfile?> loginWithGoogle() async {
+    final idToken = await GoogleAuthService.instance.signIn();
+    if (idToken == null) return null; // user cancelled the picker
+    try {
+      final res = await _dio.post('/auth/google', data: {'id_token': idToken});
+      return await _handleAuthResponse(res);
+    } on DioException catch (e) {
+      throw AuthException(mapDioError(e).message);
+    }
+  }
+
+  @override
+  Future<void> logout() async {
+    await GoogleAuthService.instance.signOut();
+    await _tokenStorage.clear();
+  }
 }

@@ -166,12 +166,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton.icon(
-                      onPressed: () => ScaffoldMessenger.of(context)
-                          .showSnackBar(const SnackBar(
-                              content: Text(
-                                  'University SSO arrives in Phase 2'))),
-                      icon: const Icon(Icons.badge_outlined),
-                      label: const Text('Sign in with University SSO'),
+                      onPressed: auth.isSubmitting
+                          ? null
+                          : () => ref
+                              .read(authProvider.notifier)
+                              .loginWithGoogle(),
+                      icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                      label: const Text('Sign in with Google'),
                     ),
                     const SizedBox(height: 24),
                     TextButton(
@@ -179,7 +180,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           () => _showDemoAccounts = !_showDemoAccounts),
                       child: Text(_showDemoAccounts
                           ? 'Hide demo accounts'
-                          : 'Show demo accounts (no backend yet)'),
+                          : 'Show demo accounts'),
                     ),
                     if (_showDemoAccounts)
                       Card(

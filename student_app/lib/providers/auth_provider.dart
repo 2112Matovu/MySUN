@@ -99,6 +99,22 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> requestPasswordReset(String email) => _repo.requestPasswordReset(email);
 
+  Future<void> loginWithGoogle() async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      final user = await _repo.loginWithGoogle();
+      if (user == null) {
+        // User cancelled the Google picker — not an error.
+        state = state.copyWith(isSubmitting: false);
+        return;
+      }
+      await _persist(user);
+      state = AuthState(status: AuthStatus.loggedIn, user: user);
+    } on AuthException catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.message);
+    }
+  }
+
   Future<void> logout() async {
     await _repo.logout();
     final prefs = ref.read(sharedPreferencesProvider);

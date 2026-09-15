@@ -2,7 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.security import get_current_user
 from app.core.supabase_client import get_supabase_admin, get_supabase_anon
-from app.schemas.user import AuthResponse, LoginRequest, SignUpRequest, UserProfile
+from app.schemas.user import (
+    AuthResponse,
+    GoogleLoginRequest,
+    LoginRequest,
+    SignUpRequest,
+    UserProfile,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -50,6 +56,29 @@ def login(body: LoginRequest) -> AuthResponse:
         )
     except Exception as exc:  # supabase-py raises AuthApiError on bad credentials
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password.") from exc
+
+    return AuthResponse(
+        access_token=result.session.access_token,
+        refresh_token=result.session.refresh_token,
+        user=_load_profile(result.user.id),
+    )
+
+
+@router.post("/google", response_model=AuthResponse)
+def google_login(body: GoogleLoginRequest) -> AuthResponse:
+    """Exchanges a Google ID token (from the Flutter app's native/web
+    `google_sign_in` flow) for a Supabase session. Requires the Google
+    provider to be enabled in the Supabase dashboard with this app's OAuth
+    client ID registered — see backend/README.md. First-time Google
+    sign-ins get a `profiles` row auto-created by the same DB trigger as
+    email sign-up (§ supabase/migrations/0001_init.sql), always as
+    `student` role."""
+    try:
+        result = get_supabase_anon().auth.sign_in_with_id_token(
+            {"provider": "google", "token": body.id_token}
+        )
+    except Exception as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Google sign-in failed.") from exc
 
     return AuthResponse(
         access_token=result.session.access_token,

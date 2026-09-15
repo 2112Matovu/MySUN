@@ -20,6 +20,9 @@ dependencies:
   # Networking (activated when the backend is wired in)
   dio: ^5.7.0
 
+  # Google Sign-In (exchanged server-side for a Supabase session)
+  google_sign_in: ^6.2.2
+
   # Local storage
   shared_preferences: ^2.3.3
 

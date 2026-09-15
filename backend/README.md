@@ -48,6 +48,38 @@ uvicorn app.main:app --reload --port 8000
   `picsum.photos` seed data). Add a bucket and an upload endpoint when real
   photo uploads are needed.
 
+## Google Sign-In setup
+
+`POST /api/v1/auth/google` exchanges a Google ID token for a Supabase
+session (`app/api/v1/auth.py`). The Flutter app gets that ID token via the
+`google_sign_in` package (`student_app/lib/core/network/google_auth_service.dart`).
+One-time setup, done outside this repo:
+
+1. **Google Cloud Console** (console.cloud.google.com/apis/credentials):
+   - Configure the OAuth consent screen if you haven't (External, app name
+     "MySun", your support email).
+   - Create Credentials → OAuth client ID → **Web application**.
+   - Authorized JavaScript origins: `http://localhost:5000` (the Flutter web
+     dev server port) — add your real domain later too.
+   - Authorized redirect URIs: `https://<your-project-ref>.supabase.co/auth/v1/callback`
+     (Supabase asks for this even though the ID-token flow doesn't redirect).
+   - Save, then copy the generated **Client ID** (`....apps.googleusercontent.com`)
+     and **Client Secret**.
+2. **Supabase dashboard** → Authentication → Providers → Google → Enable,
+   paste in that Client ID and Client Secret, Save.
+3. **Flutter app**: paste the same Client ID into
+   `student_app/lib/core/network/google_config.dart` (`googleWebClientId`).
+   Used on every platform — web via `GoogleSignIn.clientId`, Android via
+   `GoogleSignIn.serverClientId` (so the ID token's audience matches what
+   Supabase expects regardless of platform).
+
+Android specifically needs one more registration before Google Sign-In
+works on a real device/emulator: an **Android** OAuth client in the same
+Google Cloud project, tied to the app's package name
+(`ug.ac.sorotiu.mysun_app`) and its debug/release SHA-1 signing
+fingerprint (`cd student_app/android && ./gradlew signingReport`). Web
+doesn't need this — only the Web client ID above.
+
 ## Key behavior notes
 
 - **Publishing is immediate.** There is no pre-approval gate — creating an

@@ -1,7 +1,14 @@
-fastapi>=0.115
-uvicorn[standard]>=0.32
-supabase>=2.9
-pydantic[email]>=2.9
-pydantic-settings>=2.6
-python-multipart>=0.0.19
-python-dotenv>=1.0
+# Pinned to exact versions verified working on this machine's Python 3.14
+# (see backend/README.md — unpinned floors previously let a routine
+# `pip install` silently pull a breaking major version). Bump deliberately,
+# re-verify `flutter`-side field mirroring and a boot smoke test, then
+# update this file.
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+supabase==2.31.0
+pydantic[email]==2.13.5
+pydantic-settings==2.15.0
+python-multipart==0.0.32
+python-dotenv==1.2.3
+sentry-sdk[fastapi]==2.69.2
+slowapi==0.1.10

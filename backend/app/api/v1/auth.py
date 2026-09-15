@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from app.core.limiter import limiter
 from app.core.security import get_current_user
 from app.core.supabase_client import get_supabase_admin, get_supabase_anon
 from app.schemas.user import (
     AuthResponse,
     GoogleLoginRequest,
     LoginRequest,
+    RefreshRequest,
     SignUpRequest,
     UserProfile,
 )
@@ -23,7 +25,8 @@ def _load_profile(user_id: str) -> UserProfile:
 
 
 @router.post("/signup", response_model=AuthResponse)
-def signup(body: SignUpRequest) -> AuthResponse:
+@limiter.limit("5/minute")
+def signup(request: Request, body: SignUpRequest) -> AuthResponse:
     """New accounts always start as students (§4.2) — only an admin can
     promote via PATCH /admin/users/{id}/role (§7.3). The `profiles` row is
     created by a DB trigger (see supabase/migrations/0001_init.sql)."""
@@ -49,7 +52,8 @@ def signup(body: SignUpRequest) -> AuthResponse:
 
 
 @router.post("/login", response_model=AuthResponse)
-def login(body: LoginRequest) -> AuthResponse:
+@limiter.limit("8/minute")
+def login(request: Request, body: LoginRequest) -> AuthResponse:
     try:
         result = get_supabase_anon().auth.sign_in_with_password(
             {"email": body.email, "password": body.password}
@@ -65,7 +69,8 @@ def login(body: LoginRequest) -> AuthResponse:
 
 
 @router.post("/google", response_model=AuthResponse)
-def google_login(body: GoogleLoginRequest) -> AuthResponse:
+@limiter.limit("8/minute")
+def google_login(request: Request, body: GoogleLoginRequest) -> AuthResponse:
     """Exchanges a Google ID token (from the Flutter app's native/web
     `google_sign_in` flow) for a Supabase session. Requires the Google
     provider to be enabled in the Supabase dashboard with this app's OAuth
@@ -79,6 +84,29 @@ def google_login(body: GoogleLoginRequest) -> AuthResponse:
         )
     except Exception as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Google sign-in failed.") from exc
+
+    return AuthResponse(
+        access_token=result.session.access_token,
+        refresh_token=result.session.refresh_token,
+        user=_load_profile(result.user.id),
+    )
+
+
+@router.post("/refresh", response_model=AuthResponse)
+@limiter.limit("20/minute")
+def refresh(request: Request, body: RefreshRequest) -> AuthResponse:
+    """Exchanges a still-valid refresh token for a new access/refresh pair.
+    Called by the Flutter app's Dio interceptor on a 401 (`api_client.dart`)
+    so an expired access token doesn't force a re-login mid-session."""
+    try:
+        result = get_supabase_anon().auth.refresh_session(body.refresh_token)
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "Session expired. Please sign in again."
+        ) from exc
+
+    if result.session is None or result.user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired. Please sign in again.")
 
     return AuthResponse(
         access_token=result.session.access_token,

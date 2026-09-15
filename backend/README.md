@@ -28,6 +28,37 @@ uvicorn app.main:app --reload --port 8000
 5. Open `http://localhost:8000/docs` for the interactive API docs, and
    `http://localhost:8000/health` to confirm it's up.
 
+## Running in production (Docker)
+
+```bash
+docker compose up -d --build
+```
+
+This starts two containers: `api` (the FastAPI app, `--workers 2`, not
+exposed directly) and `nginx` (reverse proxy on port 80). Requires a real
+`.env` in this folder — `docker-compose.yml` loads it via `env_file`, and
+force-sets `APP_ENV=production` regardless of what's in `.env`, which locks
+CORS down to `CORS_ORIGINS` instead of `*`.
+
+**Not included, add before exposing this publicly:** TLS termination
+(`nginx/nginx.conf` is plain HTTP — put it behind certbot or a managed load
+balancer) and a CI pipeline. Optional: set `SENTRY_DSN` in `.env` to get
+error tracking; unset, it's a no-op.
+
+Logs go to stdout as one JSON object per line (`app/core/logging.py`) —
+request/response with a `request_id`, and unhandled exceptions with a full
+traceback tagged with that same `request_id`. Every response also carries
+an `X-Request-ID` header for correlating a client-reported issue to a log
+line.
+
+`/auth/login`, `/auth/signup`, `/auth/google` are rate-limited per client IP
+(`app/core/limiter.py`, applied in `app/api/v1/auth.py`) — 8/minute for
+login and Google sign-in, 5/minute for signup — to blunt brute-force and
+credential-stuffing. A tripped limit returns `429`. Real client IPs behind
+the bundled nginx are trusted via `--forwarded-allow-ips` in the
+Dockerfile's `CMD`; running outside Docker (e.g. `uvicorn --reload`
+directly) rate-limits by the direct connecting IP instead.
+
 ## Architecture
 
 - **Supabase Postgres** — schema in `supabase/migrations/`. Row Level

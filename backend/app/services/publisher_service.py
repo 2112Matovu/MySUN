@@ -1,0 +1,95 @@
+from datetime import datetime, timezone
+
+from fastapi import HTTPException, status
+
+from app.services.table_repo import TableRepo
+
+submissions_repo = TableRepo("publisher_submissions")
+
+CONTENT_TABLE_BY_TYPE = {
+    "announcement": "announcements",
+    "event": "events",
+    "accommodation": "accommodation_listings",
+    "transport": "transport_providers",
+}
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def record_publish(
+    *,
+    publisher_id: str,
+    publisher_name: str | None,
+    type: str,
+    title: str,
+    content_id: str,
+    draft_id: str | None = None,
+) -> dict:
+    """Logs a just-created piece of content as published. If [draft_id]
+    points at one of this publisher's own drafts, that row is converted in
+    place instead of left behind as a duplicate (mirrors
+    PublisherRepository.publish in the Flutter mock)."""
+    payload = {
+        "type": type,
+        "title": title,
+        "status": "published",
+        "content_id": content_id,
+        "publisher_name": publisher_name,
+        "updated_at": _now(),
+    }
+    if draft_id:
+        existing = submissions_repo.list(id=draft_id, publisher_id=publisher_id)
+        if existing:
+            return submissions_repo.update(draft_id, payload)
+    payload["publisher_id"] = publisher_id
+    return submissions_repo.create(payload)
+
+
+def remove_content(submission: dict, reason: str) -> dict:
+    """Deletes the real content row (if any) and marks the submission
+    removed — used for both admin moderation and publisher self-removal."""
+    content_id = submission.get("content_id")
+    if content_id:
+        table = CONTENT_TABLE_BY_TYPE[submission["type"]]
+        TableRepo(table).delete(content_id)
+    return submissions_repo.update(
+        submission["id"],
+        {"status": "removed", "removal_reason": reason, "updated_at": _now()},
+    )
+
+
+def remove_own_content(publisher_id: str, type: str, content_id: str) -> None:
+    """A publisher taking down their own live content — distinct from an
+    admin's terms-of-service removal, which goes through admin.py instead."""
+    matches = submissions_repo.list(
+        content_id=content_id, publisher_id=publisher_id, type=type, status="published"
+    )
+    if not matches:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only remove your own listings.")
+    remove_content(matches[0], "Removed by the publisher.")
+
+
+def compute_performance(submissions: list[dict]) -> dict:
+    """§1.4 "Performance metrics and analytics" for publishers. Counts are
+    real; views/engagement are illustrative until real tracking exists —
+    mirrors PublisherPerformance.from in the Flutter mock exactly."""
+    published = [s for s in submissions if s["status"] == "published"]
+    removed = [s for s in submissions if s["status"] == "removed"]
+    drafts = [s for s in submissions if s["status"] == "draft"]
+    by_type = {
+        t: len([s for s in submissions if s["type"] == t and s["status"] != "draft"])
+        for t in CONTENT_TABLE_BY_TYPE
+    }
+    estimated_views = 0 if not published else len(published) * 187 + 43
+    engagement_percent = 0.0 if not published else min(12 + len(published) * 1.8, 45)
+    return {
+        "total_submissions": len(submissions),
+        "published": len(published),
+        "removed": len(removed),
+        "drafts": len(drafts),
+        "by_type": by_type,
+        "estimated_views": estimated_views,
+        "engagement_percent": engagement_percent,
+    }

@@ -65,6 +65,44 @@ Saved (News / Events tabs). Alerts (mark read, swipe to dismiss, deep links).
 Profile & settings (theme, notification toggles, followed categories). Global
 search across all three content types.
 
+## Backend URL
+
+The API address is baked in at build time. Development builds default to
+`http://127.0.0.1:8000/api/v1` (the local backend — on a USB-connected
+Android device run `adb reverse tcp:8000 tcp:8000` first), so `flutter run`
+needs no extra flags. Release builds **must** pass it explicitly, or the app
+throws on startup rather than shipping pointed at localhost:
+
+```bash
+flutter build appbundle --release --dart-define=API_BASE_URL=https://api.example.ug/api/v1
+```
+
+Use `https` in production — Android blocks plain-`http` traffic in release
+builds by default.
+
+## Release signing
+
+`flutter build appbundle`/`apk --release` needs `android/key.properties`
+(gitignored — never commit it or the `.jks` it points to). A keystore
+already exists locally at `android/app/upload-keystore.jks` with matching
+`android/key.properties`; back both up somewhere safe outside this repo —
+**losing the keystore means you can never publish an update to the same
+Play Store listing again**, there's no recovery. Without `key.properties`
+present, `android/app/build.gradle.kts` falls back to debug-signing the
+release build type so `flutter run --release` still works for local
+testing, but that build must never be uploaded to the Play Store.
+
+To generate a new one from scratch (e.g. on another machine):
+
+```bash
+keytool -genkeypair -v -keystore android/app/upload-keystore.jks \
+  -alias mysun_upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Then fill in `android/key.properties` from `android/key.properties.example`
+(`keytool` on modern JDKs creates a PKCS12 keystore, which requires
+`storePassword` and `keyPassword` to be identical).
+
 ## Swapping in the backend
 
 Implement `Http*Repository` classes against the interfaces in

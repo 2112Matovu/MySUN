@@ -122,6 +122,16 @@ class AuthNotifier extends Notifier<AuthState> {
     state = const AuthState(status: AuthStatus.loggedOut);
   }
 
+  /// Called by the Dio interceptor (`api_client.dart`) when a refresh token
+  /// has expired or been revoked — tokens are already cleared by that point,
+  /// so this only needs to flip local auth state so the router redirects to
+  /// `/login`, without the Google sign-out `logout()` also does.
+  void forceLogout() {
+    final prefs = ref.read(sharedPreferencesProvider);
+    prefs.setBool(_kLoggedIn, false);
+    state = const AuthState(status: AuthStatus.loggedOut);
+  }
+
   void clearError() => state = state.copyWith(clearError: true);
 
   Future<void> _persist(UserProfile user) async {

@@ -1,0 +1,7 @@
+# Copy to android/key.properties (gitignored) and fill in real values, or
+# generate a fresh keystore + this file together — see the "Release
+# signing" section in ../README.md.
+storePassword=
+keyPassword=
+keyAlias=mysun_upload
+storeFile=upload-keystore.jks

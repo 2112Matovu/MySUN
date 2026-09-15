@@ -1,7 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Release signing lives in android/key.properties (gitignored — see
+// android/.gitignore and backend/README.md-style docs in this file's own
+// history) so the upload key never touches source control. Missing on a
+// fresh checkout by design: whoever cuts a release build generates or
+// copies it in first.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasKeystoreProperties = keystorePropertiesFile.exists()
+if (hasKeystoreProperties) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
 android {
@@ -30,11 +44,30 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasKeystoreProperties) {
+            create("release") {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Real upload key when key.properties exists (see above);
+            // otherwise fall back to the debug key so `flutter run
+            // --release` still works for local testing. A Play Store
+            // upload built without key.properties would silently ship
+            // debug-signed — CI/release scripts should check the file
+            // exists before building, not rely on this fallback.
+            signingConfig = if (hasKeystoreProperties) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
@@ -43,6 +76,13 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    // Backs SecureStoragePlugin.kt's EncryptedSharedPreferences (token
+    // storage) — plain AndroidX, not a Flutter plugin, so it isn't subject
+    // to pub's dependency resolution or Flutter's plugin embedding version.
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }
 
 flutter {

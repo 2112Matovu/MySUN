@@ -102,8 +102,7 @@ class MyPerformanceScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'View/engagement figures are estimates — real analytics arrive '
-                'once the backend is connected (§9.6).',
+                'View/engagement figures are estimates for now.',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outline),
               ),

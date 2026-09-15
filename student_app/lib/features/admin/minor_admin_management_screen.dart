@@ -83,16 +83,15 @@ class _MinorAdminCard extends StatelessWidget {
                 TextButton(
                   onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Activity log arrives with the backend')),
+                        content: Text("Activity log isn't available yet.")),
                   ),
                   child: const Text('View Activity'),
                 ),
                 TextButton(
                   onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content:
-                            Text('Fine-grained permissions arrive with the '
-                                'backend')),
+                        content: Text(
+                            "Fine-grained permissions aren't available yet.")),
                   ),
                   child: const Text('Permissions'),
                 ),

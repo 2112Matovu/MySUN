@@ -169,7 +169,7 @@ class ProfileScreen extends ConsumerWidget {
 
   void _soon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Available once the backend is connected')),
+      const SnackBar(content: Text("This isn't available yet.")),
     );
   }
 }

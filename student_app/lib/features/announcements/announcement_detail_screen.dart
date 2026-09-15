@@ -39,7 +39,7 @@ class AnnouncementDetailScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.share_outlined),
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Sharing arrives with the backend')),
+              const SnackBar(content: Text("Sharing isn't available yet.")),
             ),
           ),
         ],

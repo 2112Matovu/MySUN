@@ -41,9 +41,11 @@ class ServicesHubScreen extends ConsumerWidget {
             },
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Row(
+          SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               children: [
                 ChoiceChip(
                   avatar: const Icon(Icons.directions_bus_outlined, size: 18),

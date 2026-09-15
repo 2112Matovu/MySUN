@@ -1,8 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:mysun_app/data/models/admin_analytics.dart';
 import 'package:mysun_app/providers/admin_provider.dart';
 import 'package:mysun_app/widgets/state_views.dart';
+
+String _buildReport(AdminAnalytics a) {
+  final generatedAt = DateTime.now();
+  return '''
+MySun Admin Report
+Generated: ${generatedAt.toIso8601String()}
+
+USER METRICS
+Daily active users: ${a.dailyActiveUsers}
+Monthly active users: ${a.monthlyActiveUsers}
+Total users: ${a.totalUsers}
+Publishers: ${a.publisherCount}
+
+CONTENT METRICS
+Announcements published: ${a.announcementsPublished}
+Events created: ${a.eventsCreated}
+Average engagement: ${a.avgEngagementPercent.toStringAsFixed(1)}%
+''';
+}
+
+void _showReport(BuildContext context, AdminAnalytics a) {
+  final report = _buildReport(a);
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Admin Report'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: SelectableText(report, style: const TextStyle(fontFamily: 'monospace')),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+        FilledButton.icon(
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: report));
+            if (!context.mounted) return;
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Report copied to clipboard')),
+            );
+          },
+          icon: const Icon(Icons.copy_outlined),
+          label: const Text('Copy'),
+        ),
+      ],
+    ),
+  );
+}
 
 /// §5.3 Analytics Dashboard — Super Admin only.
 class AnalyticsScreen extends ConsumerWidget {
@@ -49,12 +104,9 @@ class AnalyticsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Report export arrives with the backend')),
-              ),
-              icon: const Icon(Icons.download_outlined),
-              label: const Text('Download Report'),
+              onPressed: () => _showReport(context, a),
+              icon: const Icon(Icons.description_outlined),
+              label: const Text('Generate Report'),
             ),
           ],
         ),

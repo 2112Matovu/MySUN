@@ -252,7 +252,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
               OutlinedButton.icon(
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Image upload arrives with the backend')),
+                      content: Text("Photo uploads aren't available yet.")),
                 ),
                 icon: const Icon(Icons.add_photo_alternate_outlined),
                 label: const Text('Event Image'),

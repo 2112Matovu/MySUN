@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:mysun_app/data/models/user_profile.dart';
 import 'package:mysun_app/data/models/user_role.dart';
 import 'package:mysun_app/providers/admin_provider.dart';
+import 'package:mysun_app/providers/auth_provider.dart';
+import 'package:mysun_app/providers/repositories.dart';
 import 'package:mysun_app/widgets/state_views.dart';
 
 /// §5.3 User Management — Super Admin only.
@@ -84,12 +86,48 @@ class _AdminsList extends ConsumerWidget {
   }
 }
 
-class _UserTile extends StatelessWidget {
+class _UserTile extends ConsumerWidget {
   const _UserTile(this.user);
   final UserProfile user;
 
+  Future<void> _removeAccess(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove access?'),
+        content: Text(
+            "${user.name} will lose ${user.role.label} access and become a regular Student."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Remove Access'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(adminRepositoryProvider)
+          .updateRole(user.id, UserRole.student);
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+    ref.invalidate(adminUsersProvider);
+    messenger.showSnackBar(
+      SnackBar(content: Text('${user.name} is now a Student')),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSelf = user.id == ref.watch(currentUserProvider).id;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
@@ -99,6 +137,13 @@ class _UserTile extends StatelessWidget {
           user.role.label,
           if (user.faculty != null) user.faculty!,
         ].join(' • ')),
+        trailing: user.role == UserRole.student || isSelf
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.remove_circle_outline),
+                tooltip: 'Remove access',
+                onPressed: () => _removeAccess(context, ref),
+              ),
       ),
     );
   }

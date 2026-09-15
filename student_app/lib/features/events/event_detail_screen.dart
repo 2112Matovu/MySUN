@@ -158,7 +158,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           },
           onAddToCalendar: () => ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Calendar export arrives with the backend')),
+                content: Text("Calendar export isn't available yet.")),
           ),
         ),
         orElse: () => const SizedBox.shrink(),

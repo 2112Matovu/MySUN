@@ -308,7 +308,7 @@ Soroti University Campus Companion
 │  Companion                      │
 ├─────────────────────────────────┤
 │  Email Address                  │
-│  [email@soroti.ac.ug      ]    │
+│  [email@sun.ac.ug         ]    │
 │                                 │
 │  Password                       │
 │  [••••••••••••••••      ]       │
@@ -345,8 +345,8 @@ Backend detects user role and shows:
 ├─────────────────────────────────┤
 │  Full Name                      │
 │  [John Opiyo            ]       │
-│  Soroti Email                   │
-│  [john.opiyo@soroti.ac.ug]     │
+│  University Email               │
+│  [john.opiyo@sun.ac.ug]        │
 │  Program/Faculty                │
 │  [Engineering (Dropdown)]       │
 │  Year of Study                  │
@@ -464,7 +464,7 @@ Backend detects user role and shows:
 ├─────────────────────────────────┤
 │  [Profile Photo]                │
 │  John Opiyo                     │
-│  john.opiyo@soroti.ac.ug       │
+│  john.opiyo@sun.ac.ug          │
 │  Engineering Year 2             │
 │                                 │
 │  Account Type: Student          │
@@ -658,7 +658,7 @@ Login → Backend checks user role →
 │  MySun Admin Portal            🔐  │
 ├────────────────────────────────────┤
 │  Email Address                     │
-│  [admin@soroti.ac.ug        ]     │
+│  [admin@sun.ac.ug           ]     │
 │  Password (12+ characters)         │
 │  [••••••••••••••••••••      ]     │
 │  [✓] Remember this device          │
@@ -767,7 +767,7 @@ Login → Backend checks user role →
 │                                    │
 │ Selected: John Opiyo               │
 │ Department: Engineering            │
-│ Email: john.opiyo@soroti.ac.ug    │
+│ Email: john.opiyo@sun.ac.ug       │
 │ Current Role: Student             │
 │                                    │
 │ New Role:                          │

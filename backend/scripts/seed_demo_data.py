@@ -15,7 +15,7 @@ from app.core.supabase_client import get_supabase_admin  # noqa: E402
 
 DEMO_ACCOUNTS = [
     {
-        "email": "student@mysun.ug",
+        "email": "student@sun.ac.ug",
         "password": "student123",
         "name": "Amos Ekiring",
         "role": "student",
@@ -24,14 +24,14 @@ DEMO_ACCOUNTS = [
         "student_id": "SU/2023/BSC/0142",
     },
     {
-        "email": "publisher@mysun.ug",
+        "email": "publisher@sun.ac.ug",
         "password": "publisher123",
         "name": "Sarah Akena",
         "role": "publisher",
         "faculty": "HR Department",
     },
     {
-        "email": "admin@mysun.ug",
+        "email": "admin@sun.ac.ug",
         "password": "admin123",
         "name": "Grace Amongin",
         "role": "admin",
@@ -285,7 +285,7 @@ def main():
     ids = ensure_accounts(admin)
     seed_content(admin, publisher_name="Sarah Akena (HR Department)")
 
-    student_id = ids["student@mysun.ug"]
+    student_id = ids["student@sun.ac.ug"]
     if not admin.table("notifications").select("id").eq("user_id", student_id).execute().data:
         admin.table("notifications").insert(
             [

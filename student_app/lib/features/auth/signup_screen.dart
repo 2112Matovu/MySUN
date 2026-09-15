@@ -81,7 +81,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         labelText: 'Soroti Email',
-                        hintText: 'john.opiyo@soroti.ac.ug',
+                        hintText: 'john.opiyo@sun.ac.ug',
                       ),
                       validator: (v) => (v == null || !v.contains('@'))
                           ? 'Enter a valid email'

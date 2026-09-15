@@ -50,34 +50,34 @@ class _DemoAccount {
 /// Detection") can be exercised end to end without the real backend.
 class MockAuthRepository implements AuthRepository {
   static final Map<String, _DemoAccount> _accounts = {
-    'student@mysun.ug': const _DemoAccount(
+    'student@sun.ac.ug': const _DemoAccount(
       'student123',
       UserProfile(
         id: 'usr-001',
         name: 'Amos Ekiring',
-        email: 'student@mysun.ug',
+        email: 'student@sun.ac.ug',
         role: UserRole.student,
         studentId: 'SU/2023/BSC/0142',
         faculty: 'Faculty of Science & Education',
         program: 'BSc. Computer Science',
       ),
     ),
-    'publisher@mysun.ug': const _DemoAccount(
+    'publisher@sun.ac.ug': const _DemoAccount(
       'publisher123',
       UserProfile(
         id: 'usr-010',
         name: 'Sarah Akena',
-        email: 'publisher@mysun.ug',
+        email: 'publisher@sun.ac.ug',
         role: UserRole.publisher,
         faculty: 'HR Department',
       ),
     ),
-    'admin@mysun.ug': const _DemoAccount(
+    'admin@sun.ac.ug': const _DemoAccount(
       'admin123',
       UserProfile(
         id: 'usr-099',
         name: 'Grace Amongin',
-        email: 'admin@mysun.ug',
+        email: 'admin@sun.ac.ug',
         role: UserRole.admin,
       ),
     ),
@@ -126,7 +126,7 @@ class MockAuthRepository implements AuthRepository {
   @override
   Future<UserProfile?> loginWithGoogle() async {
     await Future.delayed(AppConstants.mockLatency);
-    return _accounts['student@mysun.ug']!.profile;
+    return _accounts['student@sun.ac.ug']!.profile;
   }
 
   @override

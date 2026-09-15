@@ -76,7 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         labelText: 'Email address',
-                        hintText: 'you@soroti.ac.ug',
+                        hintText: 'you@sun.ac.ug',
                       ),
                       validator: (v) => (v == null || !v.contains('@'))
                           ? 'Enter a valid email'
@@ -192,24 +192,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             children: [
                               _DemoAccountTile(
                                 role: 'Student',
-                                email: 'student@mysun.ug',
+                                email: 'student@sun.ac.ug',
                                 password: 'student123',
                                 onTap: () => _fillDemo(
-                                    'student@mysun.ug', 'student123'),
+                                    'student@sun.ac.ug', 'student123'),
                               ),
                               _DemoAccountTile(
                                 role: 'Publisher',
-                                email: 'publisher@mysun.ug',
+                                email: 'publisher@sun.ac.ug',
                                 password: 'publisher123',
                                 onTap: () => _fillDemo(
-                                    'publisher@mysun.ug', 'publisher123'),
+                                    'publisher@sun.ac.ug', 'publisher123'),
                               ),
                               _DemoAccountTile(
                                 role: 'Admin',
-                                email: 'admin@mysun.ug',
+                                email: 'admin@sun.ac.ug',
                                 password: 'admin123',
                                 onTap: () =>
-                                    _fillDemo('admin@mysun.ug', 'admin123'),
+                                    _fillDemo('admin@sun.ac.ug', 'admin123'),
                               ),
                             ],
                           ),

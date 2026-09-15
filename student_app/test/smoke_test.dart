@@ -56,7 +56,7 @@ void main() {
 
     // Sign in with the demo student account (see MockAuthRepository).
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'student@mysun.ug');
+    await tester.enterText(fields.at(0), 'student@sun.ac.ug');
     await tester.enterText(fields.at(1), 'student123');
     await tester.tap(find.text('Sign In'));
 

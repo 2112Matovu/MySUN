@@ -145,6 +145,27 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           : const Text('Create Account'),
                     ),
                     const SizedBox(height: 12),
+                    const Row(
+                      children: [
+                        Expanded(child: Divider()),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('OR'),
+                        ),
+                        Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: auth.isSubmitting
+                          ? null
+                          : () => ref
+                              .read(authProvider.notifier)
+                              .loginWithGoogle(),
+                      icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                      label: const Text('Sign up with Google'),
+                    ),
+                    const SizedBox(height: 12),
                     Wrap(
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,

@@ -6,4 +6,4 @@
 /// Android via [GoogleSignIn.serverClientId] (so the ID token's audience
 /// matches what Supabase expects regardless of platform).
 const String googleWebClientId =
-    'REPLACE_ME.apps.googleusercontent.com';
+    '364494750709-i4dr9m3orvle67ak62uhu26mk9eu461r.apps.googleusercontent.com';

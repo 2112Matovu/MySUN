@@ -4,17 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import 'package:mysun_app/providers/auth_provider.dart';
 
-const _faculties = [
-  'Faculty of Science & Education',
-  'Faculty of Business & Development Studies',
-  'Faculty of Engineering & Applied Sciences',
-  'Faculty of Health Sciences',
-];
-
-const _years = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'];
-
 /// §4.2 Sign Up Screen. New accounts always start as regular students —
-/// promotion to publisher/admin is an admin-side action (§7.3).
+/// promotion to publisher/admin is an admin-side action (§7.3). No
+/// faculty/year fields here — not every account is a student (publisher,
+/// admin), so that detail is collected later, from the profile screen, only
+/// for accounts that are actually students.
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
@@ -27,8 +21,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  String _faculty = _faculties.first;
-  String _year = _years.first;
   bool _obscure = true;
 
   @override
@@ -45,8 +37,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           name: _name.text.trim(),
           email: _email.text.trim(),
           password: _password.text,
-          faculty: _faculty,
-          program: _year,
         );
   }
 
@@ -86,28 +76,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       validator: (v) => (v == null || !v.contains('@'))
                           ? 'Enter a valid email'
                           : null,
-                    ),
-                    const SizedBox(height: 14),
-                    DropdownButtonFormField<String>(
-                      initialValue: _faculty,
-                      decoration:
-                          const InputDecoration(labelText: 'Program/Faculty'),
-                      items: [
-                        for (final f in _faculties)
-                          DropdownMenuItem(value: f, child: Text(f)),
-                      ],
-                      onChanged: (v) => setState(() => _faculty = v!),
-                    ),
-                    const SizedBox(height: 14),
-                    DropdownButtonFormField<String>(
-                      initialValue: _year,
-                      decoration:
-                          const InputDecoration(labelText: 'Year of Study'),
-                      items: [
-                        for (final y in _years)
-                          DropdownMenuItem(value: y, child: Text(y)),
-                      ],
-                      onChanged: (v) => setState(() => _year = v!),
                     ),
                     const SizedBox(height: 14),
                     TextFormField(

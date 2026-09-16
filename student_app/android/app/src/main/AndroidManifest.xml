@@ -2,6 +2,11 @@
     <!-- Needed for the campus feed's network images (lib/widgets/network_image_box.dart)
          and for the future FastAPI backend calls (spec §5.3). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Camera capture for publishing forms' "Add Image" (image_picker) —
+         gallery picks go through the system Photo Picker and need no
+         permission declaration on modern Android. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:label="MySun"

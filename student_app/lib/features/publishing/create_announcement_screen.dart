@@ -9,6 +9,7 @@ import 'package:mysun_app/providers/announcements_provider.dart';
 import 'package:mysun_app/providers/auth_provider.dart';
 import 'package:mysun_app/providers/publisher_provider.dart';
 import 'package:mysun_app/providers/repositories.dart';
+import 'package:mysun_app/widgets/image_upload_helper.dart';
 
 const _departments = [
   'HR Department',
@@ -54,7 +55,9 @@ class _CreateAnnouncementScreenState
       : TimeOfDay(
           hour: _form!['expiryHour'] as int,
           minute: _form!['expiryMinute'] as int);
+  late String? _imageUrl = _form?['imageUrl'] as String?;
   bool _saving = false;
+  bool _uploadingImage = false;
 
   Map<String, dynamic>? get _form => widget.draft?.formData;
 
@@ -74,7 +77,18 @@ class _CreateAnnouncementScreenState
         'expiryDate': _hasExpiry ? _expiryDate?.toIso8601String() : null,
         'expiryHour': _hasExpiry ? _expiryTime?.hour : null,
         'expiryMinute': _hasExpiry ? _expiryTime?.minute : null,
+        'imageUrl': _imageUrl,
       };
+
+  Future<void> _pickImage() async {
+    setState(() => _uploadingImage = true);
+    final url = await pickAndUploadImage(context, ref);
+    if (!mounted) return;
+    setState(() {
+      _uploadingImage = false;
+      if (url != null) _imageUrl = url;
+    });
+  }
 
   Future<void> _pickExpiryDate() async {
     final now = DateTime.now();
@@ -131,6 +145,7 @@ class _CreateAnnouncementScreenState
                 publisherName: user.faculty ?? _department,
                 publishedAt: DateTime.now(),
                 expiresAt: _expiresAt,
+                imageUrl: _imageUrl,
               ),
             );
         await publisherRepo.publish(
@@ -250,13 +265,39 @@ class _CreateAnnouncementScreenState
                 ),
               ],
               const SizedBox(height: 14),
-              OutlinedButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("Photo uploads aren't available yet.")),
+              if (_imageUrl != null) ...[
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Image.network(_imageUrl!, fit: BoxFit.cover),
+                      ),
+                    ),
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: IconButton.filled(
+                        style: IconButton.styleFrom(
+                            backgroundColor: Colors.black54),
+                        onPressed: () => setState(() => _imageUrl = null),
+                        icon: const Icon(Icons.close, size: 18),
+                      ),
+                    ),
+                  ],
                 ),
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: const Text('Add Image'),
+                const SizedBox(height: 10),
+              ],
+              OutlinedButton.icon(
+                onPressed: _uploadingImage ? null : _pickImage,
+                icon: _uploadingImage
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.add_photo_alternate_outlined),
+                label: Text(_imageUrl == null ? 'Add Image' : 'Replace Image'),
               ),
               const SizedBox(height: 24),
               Row(

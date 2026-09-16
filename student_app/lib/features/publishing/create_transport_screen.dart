@@ -7,6 +7,7 @@ import 'package:mysun_app/data/models/transport_provider.dart';
 import 'package:mysun_app/providers/publisher_provider.dart';
 import 'package:mysun_app/providers/repositories.dart';
 import 'package:mysun_app/providers/transport_providers.dart';
+import 'package:mysun_app/widgets/image_upload_helper.dart';
 
 /// Publisher-only "add a transport provider" flow — the Transport
 /// equivalent of Create Accommodation. A published provider is inserted at
@@ -37,7 +38,9 @@ class _CreateTransportProviderScreenState
       TextEditingController(text: _form?['operatingHours'] as String?);
   late final _serviceAreas =
       TextEditingController(text: _form?['serviceAreas'] as String?);
+  late String? _imageUrl = _form?['imageUrl'] as String?;
   bool _saving = false;
+  bool _uploadingImage = false;
 
   Map<String, dynamic>? get _form => widget.draft?.formData;
 
@@ -47,7 +50,18 @@ class _CreateTransportProviderScreenState
         'contactPerson': _contactPerson.text,
         'operatingHours': _operatingHours.text,
         'serviceAreas': _serviceAreas.text,
+        'imageUrl': _imageUrl,
       };
+
+  Future<void> _pickImage() async {
+    setState(() => _uploadingImage = true);
+    final url = await pickAndUploadImage(context, ref);
+    if (!mounted) return;
+    setState(() {
+      _uploadingImage = false;
+      if (url != null) _imageUrl = url;
+    });
+  }
 
   @override
   void dispose() {
@@ -83,6 +97,7 @@ class _CreateTransportProviderScreenState
                     ? null
                     : _operatingHours.text.trim(),
                 serviceAreas: areas,
+                imageUrl: _imageUrl,
               ),
             );
         await ref.read(publisherRepositoryProvider).publish(
@@ -166,6 +181,41 @@ class _CreateTransportProviderScreenState
                   labelText: 'Service Areas',
                   hintText: 'Comma-separated, e.g. Main Campus, Soroti Town',
                 ),
+              ),
+              const SizedBox(height: 14),
+              if (_imageUrl != null) ...[
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Image.network(_imageUrl!, fit: BoxFit.cover),
+                      ),
+                    ),
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: IconButton.filled(
+                        style: IconButton.styleFrom(
+                            backgroundColor: Colors.black54),
+                        onPressed: () => setState(() => _imageUrl = null),
+                        icon: const Icon(Icons.close, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
+              OutlinedButton.icon(
+                onPressed: _uploadingImage ? null : _pickImage,
+                icon: _uploadingImage
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.add_photo_alternate_outlined),
+                label: Text(_imageUrl == null ? 'Add Photo' : 'Replace Photo'),
               ),
               const SizedBox(height: 24),
               Row(

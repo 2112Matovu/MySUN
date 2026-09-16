@@ -8,6 +8,7 @@ import 'package:mysun_app/providers/accommodation_providers.dart';
 import 'package:mysun_app/providers/auth_provider.dart';
 import 'package:mysun_app/providers/publisher_provider.dart';
 import 'package:mysun_app/providers/repositories.dart';
+import 'package:mysun_app/widgets/image_upload_helper.dart';
 
 /// §4.4-style publisher form for the Accommodation service (§6, §6.4),
 /// extended with pricing / gazetted status / room-sharing / photos.
@@ -45,6 +46,7 @@ class _CreateAccommodationScreenState
   late final List<String> _images =
       (_form?['images'] as List<dynamic>?)?.cast<String>().toList() ?? [];
   bool _saving = false;
+  bool _uploadingImage = false;
 
   Map<String, dynamic>? get _form => widget.draft?.formData;
 
@@ -70,11 +72,13 @@ class _CreateAccommodationScreenState
     super.dispose();
   }
 
-  void _addImage() {
+  Future<void> _addImage() async {
+    setState(() => _uploadingImage = true);
+    final url = await pickAndUploadImage(context, ref);
+    if (!mounted) return;
     setState(() {
-      _images.add(
-        'https://picsum.photos/seed/mysun-new-${DateTime.now().millisecondsSinceEpoch}/800/500',
-      );
+      _uploadingImage = false;
+      if (url != null) _images.add(url);
     });
   }
 
@@ -268,7 +272,7 @@ class _CreateAccommodationScreenState
                         ),
                       ),
                     InkWell(
-                      onTap: _addImage,
+                      onTap: _uploadingImage ? null : _addImage,
                       child: Container(
                         width: 90,
                         height: 90,
@@ -277,7 +281,16 @@ class _CreateAccommodationScreenState
                           border: Border.all(
                               color: Theme.of(context).colorScheme.outline),
                         ),
-                        child: const Icon(Icons.add_a_photo_outlined),
+                        child: _uploadingImage
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : const Icon(Icons.add_a_photo_outlined),
                       ),
                     ),
                   ],

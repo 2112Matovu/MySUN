@@ -8,6 +8,7 @@ import 'package:mysun_app/data/models/publisher_submission.dart';
 import 'package:mysun_app/providers/events_provider.dart';
 import 'package:mysun_app/providers/publisher_provider.dart';
 import 'package:mysun_app/providers/repositories.dart';
+import 'package:mysun_app/widgets/image_upload_helper.dart';
 
 const _organizers = [
   'Student Affairs Office',
@@ -54,7 +55,9 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       ? null
       : TimeOfDay(
           hour: _form!['endHour'] as int, minute: _form!['endMinute'] as int);
+  late String? _imageUrl = _form?['imageUrl'] as String?;
   bool _saving = false;
+  bool _uploadingImage = false;
 
   Map<String, dynamic>? get _form => widget.draft?.formData;
 
@@ -69,7 +72,18 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
         'startMinute': _startTime?.minute,
         'endHour': _endTime?.hour,
         'endMinute': _endTime?.minute,
+        'imageUrl': _imageUrl,
       };
+
+  Future<void> _pickImage() async {
+    setState(() => _uploadingImage = true);
+    final url = await pickAndUploadImage(context, ref);
+    if (!mounted) return;
+    setState(() {
+      _uploadingImage = false;
+      if (url != null) _imageUrl = url;
+    });
+  }
 
   @override
   void dispose() {
@@ -128,6 +142,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 dateTime: start,
                 endDateTime: end,
                 venue: _location.text.trim(),
+                imageUrl: _imageUrl,
               ),
             );
         await publisherRepo.publish(
@@ -249,13 +264,39 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 onChanged: (v) => setState(() => _category = v!),
               ),
               const SizedBox(height: 14),
-              OutlinedButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("Photo uploads aren't available yet.")),
+              if (_imageUrl != null) ...[
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Image.network(_imageUrl!, fit: BoxFit.cover),
+                      ),
+                    ),
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: IconButton.filled(
+                        style: IconButton.styleFrom(
+                            backgroundColor: Colors.black54),
+                        onPressed: () => setState(() => _imageUrl = null),
+                        icon: const Icon(Icons.close, size: 18),
+                      ),
+                    ),
+                  ],
                 ),
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: const Text('Event Image'),
+                const SizedBox(height: 10),
+              ],
+              OutlinedButton.icon(
+                onPressed: _uploadingImage ? null : _pickImage,
+                icon: _uploadingImage
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.add_photo_alternate_outlined),
+                label: Text(_imageUrl == null ? 'Event Image' : 'Replace Image'),
               ),
               const SizedBox(height: 24),
               Row(

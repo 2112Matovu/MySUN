@@ -10,6 +10,7 @@ from app.api.v1 import (
     notifications,
     publisher,
     transport,
+    uploads,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -22,3 +23,4 @@ api_router.include_router(bookmarks.router)
 api_router.include_router(notifications.router)
 api_router.include_router(publisher.router)
 api_router.include_router(admin.router)
+api_router.include_router(uploads.router)

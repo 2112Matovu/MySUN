@@ -59,6 +59,35 @@ the bundled nginx are trusted via `--forwarded-allow-ips` in the
 Dockerfile's `CMD`; running outside Docker (e.g. `uvicorn --reload`
 directly) rate-limits by the direct connecting IP instead.
 
+## Deploying to Render (free tier)
+
+This is the actual "put the backend somewhere it stays running" step —
+until this is done, the API only exists while `uvicorn` is running on a
+dev machine. Render builds `Dockerfile` directly (not `docker-compose.yml`
+— Render is its own reverse proxy and handles HTTPS itself, so the bundled
+`nginx` sidecar isn't used here; it's still relevant for a self-hosted VM).
+
+1. Push this repo to GitHub if you haven't (`git push`).
+2. At [render.com](https://render.com), sign up (no card required for the
+   free plan) → **New > Blueprint** → connect this GitHub repo. Render
+   reads `render.yaml` and proposes a `mysun-api` web service — accept it.
+3. Render will prompt for the env vars marked `sync: false` in
+   `render.yaml` (not stored in git): paste in `SUPABASE_URL`,
+   `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` from your Supabase
+   project's **Settings > API**, and optionally `SENTRY_DSN`.
+4. Deploy. Render gives you a URL like `https://mysun-api.onrender.com`.
+5. Update `CORS_ORIGINS` in the Render dashboard's env vars to include
+   any real web origin you serve the app from (mobile doesn't need this —
+   it authenticates with a Bearer token, not cookies).
+6. Rebuild the Flutter app pointed at the real URL:
+   `flutter build appbundle --release --dart-define=API_BASE_URL=https://mysun-api.onrender.com/api/v1`
+
+**Free-tier tradeoff**: the service spins down after ~15 minutes with no
+traffic, so the first request after a quiet period takes several seconds
+to ~1 minute while it wakes back up. Fine for a campus app's usage
+pattern; upgrade to a paid Render plan later if that cold start becomes a
+problem.
+
 ## Architecture
 
 - **Supabase Postgres** — schema in `supabase/migrations/`. Row Level

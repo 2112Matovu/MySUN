@@ -1,0 +1,33 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Connect this repo on Render (New > Blueprint) and it reads this file to
+# create the service. Render builds backend/Dockerfile directly and injects
+# its own $PORT — no docker-compose/nginx involved, Render is its own
+# reverse proxy and terminates HTTPS for you.
+#
+# The three Supabase keys use `sync: false`, meaning Render will NOT read
+# them from here — it prompts for them once in the dashboard and stores
+# them encrypted there. Never put real secret values in this file; it's
+# committed to git.
+services:
+  - type: web
+    name: mysun-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ORIGINS
+        value: http://localhost:5000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false

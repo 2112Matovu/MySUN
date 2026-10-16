@@ -3,6 +3,7 @@ plus a push to their registered devices, honouring each user's category
 preferences (profile settings)."""
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Iterable
 
 from app.core.supabase_client import get_supabase_admin
@@ -21,6 +22,7 @@ CATEGORY_BY_TYPE = {
 PREF_KEYS = tuple(CATEGORY_BY_TYPE.values())
 
 _CHUNK = 100
+_PUSH_WORKERS = 8
 
 
 def _chunks(items: list, size: int = _CHUNK):
@@ -43,7 +45,9 @@ def all_user_ids(exclude: Iterable[str] = ()) -> list[str]:
     start, page = 0, 1000
     db = get_supabase_admin()
     while True:
-        rows = db.table("profiles").select("id").range(start, start + page - 1).execute().data
+        rows = (
+            db.table("profiles").select("id").order("id").range(start, start + page - 1).execute().data
+        )
         ids.extend(r["id"] for r in rows if r["id"] not in skip)
         if len(rows) < page:
             return ids
@@ -92,10 +96,14 @@ def _push(user_ids: list[str], title: str, body: str, type: str, related_id: str
     db = get_supabase_admin()
     data = {"type": type, **({"related_id": related_id} if related_id else {})}
     dead: list[str] = []
+    tokens: list[str] = []
     for chunk in _chunks(user_ids):
-        tokens = db.table("device_tokens").select("token").in_("user_id", chunk).execute().data
-        for t in tokens:
-            if fcm.send(t["token"], title, body, data) == "invalid":
-                dead.append(t["token"])
+        rows = db.table("device_tokens").select("token").in_("user_id", chunk).execute().data
+        tokens.extend(r["token"] for r in rows)
+    # Sends are blocking HTTP calls; fan them out so a big publish does not
+    # hold the worker for (tokens x latency).
+    with ThreadPoolExecutor(max_workers=_PUSH_WORKERS) as pool:
+        results = pool.map(lambda tok: (tok, fcm.send(tok, title, body, data)), tokens)
+        dead = [tok for tok, outcome in results if outcome == "invalid"]
     for chunk in _chunks(dead):
         db.table("device_tokens").delete().in_("token", chunk).execute()

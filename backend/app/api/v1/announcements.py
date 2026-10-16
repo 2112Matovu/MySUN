@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from fastapi import HTTPException, status
 
-from app.core.security import get_current_user, require_publisher
+from app.core.security import get_current_user, get_optional_user, require_publisher
 from app.schemas.content import Announcement, AnnouncementCreate
 from app.core.supabase_client import get_supabase_admin
 from app.schemas.user import UserProfile
@@ -19,6 +19,7 @@ from app.services.content_filters import (
 from app.services.scheduling import release_due_content, reschedule
 from app.services.publisher_service import record_publish, remove_own_content
 from app.services.table_repo import TableRepo
+from app.services.usage import can_preview, record_view
 
 router = APIRouter(prefix="/announcements", tags=["announcements"])
 repo = TableRepo("announcements")
@@ -37,10 +38,13 @@ def list_announcements(category: str | None = None, include_expired: bool = Fals
 
 
 @router.get("/{id}", response_model=Announcement)
-def get_announcement(id: str) -> dict:
+def get_announcement(id: str, viewer: UserProfile | None = Depends(get_optional_user)) -> dict:
     row = repo.get(id)
     if not is_live(row):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "announcements/%s not found" % id)
+        if not can_preview("announcement", id, viewer):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "announcements/%s not found" % id)
+        return row
+    record_view("announcement", id, viewer.id if viewer else None)
     return row
 
 

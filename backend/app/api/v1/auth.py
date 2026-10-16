@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.core.limiter import limiter
@@ -7,10 +9,15 @@ from app.schemas.user import (
     AuthResponse,
     GoogleLoginRequest,
     LoginRequest,
+    PasswordResetRequest,
     RefreshRequest,
     SignUpRequest,
     UserProfile,
 )
+
+from app.services import audit
+
+logger = logging.getLogger("mysun")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -118,3 +125,53 @@ def refresh(request: Request, body: RefreshRequest) -> AuthResponse:
 @router.get("/me", response_model=UserProfile)
 def me(user: UserProfile = Depends(get_current_user)) -> UserProfile:
     return user
+
+
+@router.post("/password-reset", status_code=202)
+@limiter.limit("5/minute")
+def password_reset(request: Request, body: PasswordResetRequest) -> dict:
+    """Emails a reset link through Supabase Auth. Always answers 202, whether
+    or not the address has an account, so it cannot be used to find out who
+    is registered."""
+    try:
+        get_supabase_anon().auth.reset_password_for_email(body.email)
+    except Exception:
+        logger.exception("Password reset request failed")
+    return {"status": "If an account exists for that email, a reset link has been sent."}
+
+
+def _rows(table: str, column: str, user_id: str) -> list[dict]:
+    return get_supabase_admin().table(table).select("*").eq(column, user_id).execute().data
+
+
+@router.get("/me/export")
+def export_my_data(user: UserProfile = Depends(get_current_user)) -> dict:
+    """Everything MySun holds about the signed-in user, as JSON (FR-AUTH-08)."""
+    return {
+        "profile": user.model_dump(),
+        "bookmarks": _rows("bookmarks", "user_id", user.id),
+        "notifications": _rows("notifications", "user_id", user.id),
+        "event_registrations": _rows("event_registrations", "user_id", user.id),
+        "bookings": _rows("bookings", "student_id", user.id),
+        "ratings": _rows("transport_ratings", "user_id", user.id),
+        "submissions": _rows("publisher_submissions", "publisher_id", user.id),
+        "devices": [
+            {"platform": d.get("platform"), "updated_at": d.get("updated_at")}
+            for d in _rows("device_tokens", "user_id", user.id)
+        ],
+    }
+
+
+@router.delete("/me", status_code=204)
+def delete_my_account(user: UserProfile = Depends(get_current_user)) -> None:
+    """Permanently deletes the account (FR-AUTH-08). The auth user goes, and
+    the profile with its bookmarks, notifications, registrations, bookings
+    and submissions follow by cascade. Content already published stays live;
+    ask an admin to remove it first if it should go too."""
+    if user.role == "admin":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Super Admin accounts cannot delete themselves. Ask another Super Admin to change your role first.",
+        )
+    audit.record(user, "account_deleted", "user", user.id, {"email": user.email})
+    get_supabase_admin().auth.admin.delete_user(user.id)

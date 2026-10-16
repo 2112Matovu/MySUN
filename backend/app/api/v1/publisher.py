@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.security import require_publisher
 from app.schemas.publisher import DraftSave, PublisherPerformance, PublisherSubmission
 from app.schemas.user import UserProfile
-from app.services.publisher_service import compute_performance, remove_content, submissions_repo
+from app.services.publisher_service import compute_performance, engagement_stats, remove_content, submissions_repo
 
 router = APIRouter(prefix="/publisher", tags=["publisher"])
 
@@ -60,4 +60,5 @@ def remove_own_submission(
 @router.get("/performance", response_model=PublisherPerformance)
 def my_performance(user: UserProfile = Depends(require_publisher)) -> dict:
     submissions = submissions_repo.list(publisher_id=user.id)
-    return compute_performance(submissions)
+    views, interactions = engagement_stats(submissions)
+    return compute_performance(submissions, views, interactions)

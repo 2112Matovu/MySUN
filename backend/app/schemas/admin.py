@@ -28,5 +28,16 @@ class AdminAnalytics(BaseModel):
     storage_used_percent: float = 0
 
 
+class AuditEntry(BaseModel):
+    id: str
+    actor_id: str | None = None
+    actor_name: str | None = None
+    action: str
+    target_type: str | None = None
+    target_id: str | None = None
+    detail: dict = {}
+    created_at: str
+
+
 class VerifyRequest(BaseModel):
     is_verified: bool

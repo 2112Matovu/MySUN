@@ -3,6 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.supabase_client import get_supabase_admin
 from app.schemas.user import UserProfile
+from app.services.usage import touch_last_seen
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -34,7 +35,22 @@ async def get_current_user(
     if not result or not result.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found for this account")
 
+    touch_last_seen(result.data)
     return UserProfile.model_validate(result.data)
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> UserProfile | None:
+    """Like get_current_user, but anonymous or bad tokens give None instead
+    of an error. For public endpoints that behave a little differently for
+    their owner (e.g. previewing a scheduled post)."""
+    if credentials is None:
+        return None
+    try:
+        return await get_current_user(credentials)
+    except HTTPException:
+        return None
 
 
 def require_role(*roles: str):

@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
+from app.core.supabase_client import get_supabase_admin
 from app.services.notify import notify_users
 from app.services.table_repo import TableRepo
 
@@ -87,10 +88,41 @@ def remove_own_content(publisher_id: str, type: str, content_id: str) -> None:
     remove_content(matches[0], "Removed by the publisher.")
 
 
-def compute_performance(submissions: list[dict]) -> dict:
-    """§1.4 "Performance metrics and analytics" for publishers. Counts are
-    real; views/engagement are illustrative until real tracking exists —
-    mirrors PublisherPerformance.from in the Flutter mock exactly."""
+def engagement_stats(submissions: list[dict]) -> tuple[int, int]:
+    """(views, interactions) for a publisher's live announcements and events,
+    from content_views, bookmarks and event registrations."""
+    db = get_supabase_admin()
+    ids = {
+        t: [s["content_id"] for s in submissions
+            if s["type"] == t and s["status"] == "published" and s.get("content_id")]
+        for t in ("announcement", "event")
+    }
+    views = interactions = 0
+    for t, content_ids in ids.items():
+        if not content_ids:
+            continue
+        views += len(
+            db.table("content_views").select("id").eq("content_type", t)
+            .in_("content_id", content_ids).execute().data
+        )
+        interactions += len(
+            db.table("bookmarks").select("user_id").eq("content_type", t)
+            .in_("content_id", content_ids).execute().data
+        )
+        if t == "event":
+            interactions += len(
+                db.table("event_registrations").select("user_id")
+                .in_("event_id", content_ids).execute().data
+            )
+    return views, interactions
+
+
+def compute_performance(
+    submissions: list[dict], views: int = 0, interactions: int = 0
+) -> dict:
+    """§1.4 "Performance metrics and analytics" for publishers. All real:
+    views come from content_views, and engagement is the share of views that
+    ended in a bookmark or an event registration."""
     published = [s for s in submissions if s["status"] == "published"]
     removed = [s for s in submissions if s["status"] == "removed"]
     drafts = [s for s in submissions if s["status"] == "draft"]
@@ -98,14 +130,13 @@ def compute_performance(submissions: list[dict]) -> dict:
         t: len([s for s in submissions if s["type"] == t and s["status"] != "draft"])
         for t in CONTENT_TABLE_BY_TYPE
     }
-    estimated_views = 0 if not published else len(published) * 187 + 43
-    engagement_percent = 0.0 if not published else min(12 + len(published) * 1.8, 45)
+    engagement_percent = round(min(interactions / views * 100, 100), 1) if views else 0.0
     return {
         "total_submissions": len(submissions),
         "published": len(published),
         "removed": len(removed),
         "drafts": len(drafts),
         "by_type": by_type,
-        "estimated_views": estimated_views,
+        "estimated_views": views,
         "engagement_percent": engagement_percent,
     }

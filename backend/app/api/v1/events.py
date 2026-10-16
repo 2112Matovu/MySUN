@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from app.core.security import get_current_user, require_publisher
+from app.core.security import get_current_user, get_optional_user, require_publisher
 from app.core.supabase_client import get_supabase_admin
 from app.schemas.content import Event, EventCreate
 from app.schemas.user import UserProfile
@@ -12,6 +12,7 @@ from app.services.content_filters import is_live, is_live_filter, validate_publi
 from app.services.scheduling import release_due_content, reschedule
 from app.services.publisher_service import record_publish, remove_own_content
 from app.services.table_repo import TableRepo
+from app.services.usage import can_preview, record_view
 
 router = APIRouter(prefix="/events", tags=["events"])
 repo = TableRepo("events")
@@ -63,10 +64,13 @@ def unregister(id: str, user: UserProfile = Depends(get_current_user)) -> dict:
 
 
 @router.get("/{id}", response_model=Event)
-def get_event(id: str) -> dict:
+def get_event(id: str, viewer: UserProfile | None = Depends(get_optional_user)) -> dict:
     row = repo.get(id)
     if not is_live(row):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "events/%s not found" % id)
+        if not can_preview("event", id, viewer):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "events/%s not found" % id)
+        return row
+    record_view("event", id, viewer.id if viewer else None)
     return row
 
 
@@ -113,6 +117,8 @@ def reschedule_event(
     """Moves a still-scheduled event, or publishes it now (null)."""
     event = repo.get(id)
     when = body.publish_at
+    if when and when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)  # naive times are taken as UTC
     if when and datetime.fromisoformat(event["date_time"]) <= when:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "The event would start before it goes live"

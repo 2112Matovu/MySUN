@@ -92,6 +92,8 @@ def create_booking(body: BookingCreate, user: UserProfile = Depends(get_current_
     )
     if not provider or not provider.data:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Rider not found")
+    if _owner_id(body.provider_id) == user.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot book your own listing")
 
     if body.requested_time and body.requested_time < datetime.now(timezone.utc) - timedelta(
         minutes=5

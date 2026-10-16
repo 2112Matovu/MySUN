@@ -31,3 +31,9 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      - key: FCM_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: ADMIN_REQUIRE_2FA
+        value: "false"

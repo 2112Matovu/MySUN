@@ -1,0 +1,202 @@
+HOW TO RUN MYSUN
+================
+
+MySun has two parts:
+
+  1. The BACKEND (backend/ folder): a Python API. This is the part that has to
+     be hosted on the internet so phones can reach it. Today it only runs on
+     your own computer through a temporary tunnel.
+  2. The APP (student_app/ folder): the Flutter Android app. It talks to the
+     backend over HTTPS. Once the backend has a permanent web address (the
+     DNS name), we build the app pointing at it.
+
+The database, logins and photo storage are NOT on the server being hosted.
+They already live in Supabase (a cloud service). The hosted backend just talks
+to Supabase and to Firebase (for push notifications).
+
+
+PART A. WHAT THE PERSON HOSTING THE BACKEND MUST DO
+---------------------------------------------------
+
+What the host needs from you (ask the owner, never post these in chat/email in
+plain text; send them privately):
+
+  - The repository: https://github.com/2112Matovu/MySUN.git (folder: backend/)
+  - SUPABASE_URL               (Supabase > Project Settings > API)
+  - SUPABASE_ANON_KEY          (same page; "anon" or "publishable" key)
+  - SUPABASE_SERVICE_ROLE_KEY  (same page; "service_role" or "secret" key.
+                                Server only. Never put it in the app.)
+  - FCM_SERVICE_ACCOUNT_JSON   (the contents of the Firebase service-account
+                                file backend/fcm-service-account.json, for
+                                project mysun-5cede. Optional: without it the
+                                app still works but phones get no push alerts.)
+  - CRON_SECRET                (any long random string you invent; used by the
+                                scheduler in step 7)
+
+What the server must be:
+
+  - Any machine that can run Docker (a small cloud VM with 1 GB RAM is
+    enough), OR a platform that builds a Dockerfile, such as Render, Railway,
+    Fly.io or Google Cloud Run.
+  - Always on. The free Render plan sleeps after 15 minutes idle, which makes
+    the first request slow; a small paid instance or a VM avoids that.
+  - Outbound internet access (it calls Supabase and Google/Firebase).
+
+OPTION 1: A VM OR ANY SERVER WITH DOCKER (recommended for a permanent setup)
+
+  1. Install Docker and Docker Compose on the server.
+  2. Get the code:
+         git clone https://github.com/2112Matovu/MySUN.git
+         cd MySUN/backend
+  3. Create the settings file. Copy the example and fill it in:
+         cp .env.example .env
+     Set at least:
+         SUPABASE_URL=...
+         SUPABASE_ANON_KEY=...
+         SUPABASE_SERVICE_ROLE_KEY=...
+         APP_ENV=production
+         CORS_ORIGINS=https://api.<your-domain>
+         FCM_SERVICE_ACCOUNT_JSON=<the whole JSON on one line, or a file path>
+         CRON_SECRET=<long random string>
+         ADMIN_REQUIRE_2FA=false
+     (APP_ENV is forced to production by docker-compose anyway.)
+  4. Start it:
+         docker compose up -d --build
+     This runs the API plus an nginx front door on port 80.
+  5. Check it works from the server:
+         curl http://localhost/health
+     It must answer {"status":"ok",...}.
+  6. HTTPS (REQUIRED, see Part B): nginx here is plain HTTP only. Put HTTPS in
+     front of it with one of:
+       - Caddy or certbot on the same server, or
+       - Cloudflare in front of the domain (free; set SSL mode "Full"), or
+       - the cloud provider's managed load balancer with a certificate.
+     Phones will not talk to a plain http:// address reliably, so the final
+     address MUST start with https://
+  7. Scheduler (reminders, scheduled posts, old-account cleanup). The API runs
+     reminders itself every 5 minutes while awake. Also add a cron job /
+     external pinger so nothing is missed:
+         every 5 minutes:  POST https://<api-domain>/api/v1/internal/run-reminders
+         once a month:     POST https://<api-domain>/api/v1/internal/purge-inactive
+         both with header:  X-Cron-Secret: <the CRON_SECRET value>
+  8. Updating later:
+         cd MySUN && git pull && cd backend && docker compose up -d --build
+
+OPTION 2: RENDER (easiest, no server to look after)
+
+  1. Sign in at render.com (the free plan needs no card).
+  2. New > Blueprint > connect the GitHub repo MySUN. Render reads
+     backend/render.yaml and proposes a service called "mysun-api". Accept.
+  3. When asked, paste the secret values: SUPABASE_URL, SUPABASE_ANON_KEY,
+     SUPABASE_SERVICE_ROLE_KEY, FCM_SERVICE_ACCOUNT_JSON (paste the JSON
+     contents, not a file path), CRON_SECRET. SENTRY_DSN can stay empty.
+  4. Deploy. Render gives an address like https://mysun-api.onrender.com and
+     handles HTTPS by itself.
+  5. To use your own DNS name: Render dashboard > the service > Settings >
+     Custom Domains > add api.<your-domain>, then create the DNS record Render
+     shows (see Part B).
+  6. Do step 7 above (scheduler) using the Render address.
+
+THINGS THAT MUST BE DONE ONCE IN SUPABASE (by you, the project owner)
+
+  - SQL Editor: run every file in backend/supabase/migrations/ in order,
+    0001 up to 0006. Skip any you already ran.
+  - Authentication > URL Configuration: set the Site URL (used by the password
+    reset email link).
+  - Authentication > Providers > Google: already configured if Google sign-in
+    works today.
+
+
+PART B. WHAT THE HOST MUST GIVE YOU: THE DNS NAME
+-------------------------------------------------
+
+Ask the host to set up a domain name for the API, for example
+api.mysun.example. (A name you own or that they provide.) That means:
+
+  1. A domain name exists (bought from a registrar such as Namecheap or
+     Google Domains, or a subdomain of an existing one).
+  2. In that domain's DNS settings, add ONE record pointing the API name at
+     the server:
+         - If hosting on a VM with a fixed IP:   type A,
+               name api, value <the server's public IP address>
+         - If hosting on Render/Cloud Run/etc.:  type CNAME,
+               name api, value <the host name the platform tells you>
+  3. HTTPS certificate for that name (Part A step 6, or automatic on Render).
+  4. Wait for DNS to spread (usually minutes, at most a few hours).
+
+They then send you ONE line: the final API address, for example
+
+         https://api.mysun.example
+
+How to confirm it works. Open this in any phone or computer browser:
+
+         https://api.mysun.example/health
+
+It must show: {"status":"ok", ...}. If it does, the backend is hosted
+correctly. (Also, https://api.mysun.example/docs lists every endpoint.)
+
+
+PART C. CONNECTING THE APP TO THE HOSTED BACKEND (you or me, on your PC)
+------------------------------------------------------------------------
+
+The app address is set when the APK is built. Nothing is edited in the code.
+With the address from Part B, in PowerShell:
+
+    cd "C:\Users\Mishael Jude\Desktop\MySun\student_app"
+    flutter build apk --release --dart-define=API_BASE_URL=https://api.mysun.example/api/v1
+
+(Note the "/api/v1" on the end.) The finished file is:
+
+    student_app\build\app\outputs\flutter-apk\app-release.apk
+
+Install it on the phone (copy it over and open it, allowing "install unknown
+apps"). For the Play Store, build an app bundle instead:
+
+    flutter build appbundle --release --dart-define=API_BASE_URL=https://api.mysun.example/api/v1
+
+The app needs these files in place when building (they are NOT in git, keep
+them safe and backed up):
+    student_app\android\app\google-services.json     (Firebase, for push)
+    student_app\android\app\upload-keystore.jks       (release signing)
+    student_app\android\key.properties                (signing passwords)
+Losing the keystore means you can never update the same app on the Play Store.
+
+
+PART D. RUNNING IT ON YOUR OWN PC FOR TESTING (no hosting needed)
+-----------------------------------------------------------------
+
+Backend (PowerShell, window 1):
+    cd "C:\Users\Mishael Jude\Desktop\MySun\backend"
+    .venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+    (First time only: create .venv and run  pip install -r requirements.txt,
+     and copy .env.example to .env with the Supabase keys filled in.)
+
+Temporary public address (window 2), so a phone can reach your PC:
+    cloudflared tunnel --url http://localhost:8000
+    It prints an address like https://something-random.trycloudflare.com
+    (it changes every time it is started).
+
+Build and install a test app pointing at that address:
+    cd "C:\Users\Mishael Jude\Desktop\MySun\student_app"
+    flutter build apk --release --dart-define=API_BASE_URL=https://something-random.trycloudflare.com/api/v1
+
+Run the checks (optional):
+    backend:     cd backend ; .venv\Scripts\python -m pytest
+    app:         cd student_app ; flutter analyze ; flutter test
+
+
+PART E. AFTER IT IS HOSTED: CHECKLIST
+-------------------------------------
+
+  [ ] https://<api-domain>/health shows ok
+  [ ] Supabase migrations 0001-0006 have all been run
+  [ ] App built with the real https address and installed on a phone
+  [ ] Sign up / log in works; a published announcement appears on a second phone
+  [ ] Push test: publish an announcement and see the notification arrive
+  [ ] Scheduler set up (Part A step 7)
+  [ ] Every admin enrolled in two-factor (Profile > Two-factor authentication),
+      THEN set ADMIN_REQUIRE_2FA=true on the server and restart it
+  [ ] Backups scheduled (see docs/OPERATIONS.md) and a restore tested once
+  [ ] Uptime monitor pointed at https://<api-domain>/health
+
+More detail: README.md, backend/README.md, docs/OPERATIONS.md.

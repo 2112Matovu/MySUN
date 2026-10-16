@@ -1,9 +1,9 @@
 enum SubmissionType { announcement, event, accommodation, transport }
 
 /// Publishing is immediate (no pre-approval gate) — a submission is either
-/// still a private [draft], [published] and live, or [removed] by an admin
-/// for violating the terms of service.
-enum SubmissionStatus { draft, published, removed }
+/// still a private [draft], [scheduled] to go live later, [published] and
+/// live, or [removed] by an admin for violating the terms of service.
+enum SubmissionStatus { draft, scheduled, published, removed }
 
 /// A publisher's content submission (spec §4.4, §8.2/8.3 `status` column,
 /// adapted: this app publishes on submit and only supports after-the-fact
@@ -21,6 +21,7 @@ class PublisherSubmission {
     this.formData,
     this.publisherName = 'Sarah Akena (HR Department)',
     this.removalReason,
+    this.publishAt,
   });
 
   final String id;
@@ -41,6 +42,9 @@ class PublisherSubmission {
   final String publisherName;
   final String? removalReason;
 
+  /// When a [SubmissionStatus.scheduled] item goes live.
+  final DateTime? publishAt;
+
   factory PublisherSubmission.fromJson(Map<String, dynamic> json) =>
       PublisherSubmission(
         id: json['id'] as String,
@@ -52,6 +56,9 @@ class PublisherSubmission {
         formData: json['form_data'] as Map<String, dynamic>?,
         publisherName: json['publisher_name'] as String? ?? 'Publisher',
         removalReason: json['removal_reason'] as String?,
+        publishAt: json['publish_at'] == null
+            ? null
+            : DateTime.parse(json['publish_at'] as String).toLocal(),
       );
 
   PublisherSubmission copyWith({
@@ -61,6 +68,7 @@ class PublisherSubmission {
     String? contentId,
     Map<String, dynamic>? formData,
     String? removalReason,
+    DateTime? publishAt,
   }) =>
       PublisherSubmission(
         id: id,
@@ -72,5 +80,6 @@ class PublisherSubmission {
         formData: formData ?? this.formData,
         publisherName: publisherName,
         removalReason: removalReason ?? this.removalReason,
+        publishAt: publishAt ?? this.publishAt,
       );
 }

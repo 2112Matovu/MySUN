@@ -14,6 +14,7 @@ class Announcement {
     this.isImportant = false,
     this.imageUrl,
     this.expiresAt,
+    this.publishAt,
   });
 
   final String id;
@@ -26,18 +27,24 @@ class Announcement {
   final String? imageUrl;
   final DateTime? expiresAt;
 
+  /// When a scheduled announcement goes live; null = published immediately.
+  final DateTime? publishAt;
+
   factory Announcement.fromJson(Map<String, dynamic> json) => Announcement(
         id: json['id'] as String,
         title: json['title'] as String,
         description: json['description'] as String,
         category: json['category'] as String,
         publisherName: json['publisher_name'] as String? ?? 'Soroti University',
-        publishedAt: DateTime.parse(json['published_at'] as String),
+        publishedAt: DateTime.parse(json['published_at'] as String).toLocal(),
         isImportant: json['is_important'] as bool? ?? false,
         imageUrl: json['image_url'] as String?,
         expiresAt: json['expires_at'] == null
             ? null
-            : DateTime.parse(json['expires_at'] as String),
+            : DateTime.parse(json['expires_at'] as String).toLocal(),
+        publishAt: json['publish_at'] == null
+            ? null
+            : DateTime.parse(json['publish_at'] as String).toLocal(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -50,6 +57,7 @@ class Announcement {
         'is_important': isImportant,
         'image_url': imageUrl,
         'expires_at': expiresAt?.toIso8601String(),
+        'publish_at': publishAt?.toIso8601String(),
       };
 
   /// True once [expiresAt] has passed — this is what drops it out of the

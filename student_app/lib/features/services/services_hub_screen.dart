@@ -5,11 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:mysun_app/data/models/accommodation_listing.dart';
 import 'package:mysun_app/providers/accommodation_providers.dart';
 import 'package:mysun_app/providers/auth_provider.dart';
+import 'package:mysun_app/features/services/campus_services_section.dart';
 import 'package:mysun_app/features/transport/transport_screen.dart';
 import 'package:mysun_app/widgets/accommodation_card.dart';
 import 'package:mysun_app/widgets/state_views.dart';
 
-enum _Service { transport, accommodation }
+enum _Service { transport, accommodation, campus }
 
 /// §4.3 Services Hub — extensible services framework (§6). Transport and
 /// Accommodation are both live; new services slot in the same way.
@@ -38,6 +39,7 @@ class ServicesHubScreen extends ConsumerWidget {
                   icon: const Icon(Icons.add_home_outlined),
                   label: const Text('Add Listing'),
                 ),
+              _Service.campus => null,
             },
       body: Column(
         children: [
@@ -65,13 +67,13 @@ class ServicesHubScreen extends ConsumerWidget {
                       .state = _Service.accommodation,
                 ),
                 const SizedBox(width: 8),
-                ActionChip(
-                  avatar: const Icon(Icons.add, size: 18),
-                  label: const Text('More'),
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('More services are on the way')),
-                  ),
+                ChoiceChip(
+                  avatar: const Icon(Icons.apartment_outlined, size: 18),
+                  label: const Text('Campus services'),
+                  selected: selected == _Service.campus,
+                  onSelected: (_) => ref
+                      .read(_selectedServiceProvider.notifier)
+                      .state = _Service.campus,
                 ),
               ],
             ),
@@ -80,6 +82,7 @@ class ServicesHubScreen extends ConsumerWidget {
             child: switch (selected) {
               _Service.transport => const TransportSection(),
               _Service.accommodation => const _AccommodationSection(),
+              _Service.campus => const CampusServicesSection(),
             },
           ),
         ],

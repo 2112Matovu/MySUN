@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Holds the Supabase-issued access/refresh tokens (§9.1) in the Android
 /// Keystore via a small in-house native channel
@@ -13,6 +15,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// still calls the removed v1 `Registrar` API). Persistence is async, but
 /// `accessToken`/`refreshToken` stay synchronous for the Dio interceptor by
 /// keeping an in-memory copy hydrated once via [load] at app startup.
+///
+/// The native channel has no web-side handler (MethodChannel can't reach
+/// into the browser), so on web this falls back to `shared_preferences`
+/// (browser localStorage) — fine for local dev/preview in Chrome, but not
+/// the real security guarantee the Android Keystore path gives.
 class TokenStorage {
   static const _channel = MethodChannel('mysun/secure_storage');
   static const _kAccessToken = 'access_token';
@@ -24,25 +31,51 @@ class TokenStorage {
   String? get accessToken => _accessToken;
   String? get refreshToken => _refreshToken;
 
+  Future<String?> _get(String key) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    }
+    return _channel.invokeMethod<String>('get', {'key': key});
+  }
+
+  Future<void> _put(String key, String value) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
+      return;
+    }
+    await _channel.invokeMethod('put', {'key': key, 'value': value});
+  }
+
+  Future<void> _remove(String key) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(key);
+      return;
+    }
+    await _channel.invokeMethod('remove', {'key': key});
+  }
+
   Future<void> load() async {
-    _accessToken = await _channel.invokeMethod<String>('get', {'key': _kAccessToken});
-    _refreshToken = await _channel.invokeMethod<String>('get', {'key': _kRefreshToken});
+    _accessToken = await _get(_kAccessToken);
+    _refreshToken = await _get(_kRefreshToken);
   }
 
   Future<void> save({required String accessToken, String? refreshToken}) async {
     _accessToken = accessToken;
-    await _channel.invokeMethod('put', {'key': _kAccessToken, 'value': accessToken});
+    await _put(_kAccessToken, accessToken);
     if (refreshToken != null) {
       _refreshToken = refreshToken;
-      await _channel.invokeMethod('put', {'key': _kRefreshToken, 'value': refreshToken});
+      await _put(_kRefreshToken, refreshToken);
     }
   }
 
   Future<void> clear() async {
     _accessToken = null;
     _refreshToken = null;
-    await _channel.invokeMethod('remove', {'key': _kAccessToken});
-    await _channel.invokeMethod('remove', {'key': _kRefreshToken});
+    await _remove(_kAccessToken);
+    await _remove(_kRefreshToken);
   }
 }
 

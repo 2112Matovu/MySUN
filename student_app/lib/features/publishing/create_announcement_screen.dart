@@ -10,6 +10,7 @@ import 'package:mysun_app/providers/auth_provider.dart';
 import 'package:mysun_app/providers/publisher_provider.dart';
 import 'package:mysun_app/providers/repositories.dart';
 import 'package:mysun_app/widgets/image_upload_helper.dart';
+import 'package:mysun_app/widgets/schedule_picker.dart';
 
 const _departments = [
   'HR Department',
@@ -56,6 +57,9 @@ class _CreateAnnouncementScreenState
           hour: _form!['expiryHour'] as int,
           minute: _form!['expiryMinute'] as int);
   late String? _imageUrl = _form?['imageUrl'] as String?;
+  late DateTime? _publishAt = _form?['publishAt'] == null
+      ? null
+      : DateTime.parse(_form!['publishAt'] as String);
   bool _saving = false;
   bool _uploadingImage = false;
 
@@ -78,6 +82,7 @@ class _CreateAnnouncementScreenState
         'expiryHour': _hasExpiry ? _expiryTime?.hour : null,
         'expiryMinute': _hasExpiry ? _expiryTime?.minute : null,
         'imageUrl': _imageUrl,
+        'publishAt': _publishAt?.toIso8601String(),
       };
 
   Future<void> _pickImage() async {
@@ -116,6 +121,9 @@ class _CreateAnnouncementScreenState
   String _fmtExpiryTime() =>
       _expiryTime == null ? 'End of day' : _expiryTime!.format(context);
 
+  void _toast(String message) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(message)));
+
   @override
   void dispose() {
     _title.dispose();
@@ -131,6 +139,17 @@ class _CreateAnnouncementScreenState
       );
       return;
     }
+    if (submit && _publishAt != null) {
+      if (_publishAt!.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+        _toast('That time has passed. Pick a new one or publish now.');
+        return;
+      }
+      final expires = _expiresAt;
+      if (expires != null && !expires.isAfter(_publishAt!)) {
+        _toast('It would expire before it goes live');
+        return;
+      }
+    }
     setState(() => _saving = true);
     final publisherRepo = ref.read(publisherRepositoryProvider);
     try {
@@ -145,6 +164,7 @@ class _CreateAnnouncementScreenState
                 publisherName: user.faculty ?? _department,
                 publishedAt: DateTime.now(),
                 expiresAt: _expiresAt,
+                publishAt: _publishAt,
                 imageUrl: _imageUrl,
               ),
             );
@@ -174,7 +194,11 @@ class _CreateAnnouncementScreenState
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(submit ? 'Published to the campus feed' : 'Draft saved'),
+      content: Text(!submit
+          ? 'Draft saved'
+          : _publishAt == null
+              ? 'Published to the campus feed'
+              : 'Scheduled for ${describeSchedule(_publishAt!)}'),
     ));
     context.pop();
   }
@@ -299,7 +323,12 @@ class _CreateAnnouncementScreenState
                     : const Icon(Icons.add_photo_alternate_outlined),
                 label: Text(_imageUrl == null ? 'Add Image' : 'Replace Image'),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              SchedulePicker(
+                value: _publishAt,
+                onChanged: (v) => setState(() => _publishAt = v),
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -319,7 +348,7 @@ class _CreateAnnouncementScreenState
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('Publish'),
+                          : Text(_publishAt == null ? 'Publish' : 'Schedule'),
                     ),
                   ),
                 ],

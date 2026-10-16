@@ -48,3 +48,13 @@ Future<void> removeMyContent(WidgetRef ref, PublisherSubmission submission) asyn
   ref.invalidate(publisherSubmissionsProvider);
   ref.invalidate(publisherPerformanceProvider);
 }
+
+/// Moves a scheduled announcement or event, or publishes it now (null).
+Future<void> rescheduleMyContent(
+    WidgetRef ref, PublisherSubmission submission, DateTime? publishAt) async {
+  await ref.read(publisherRepositoryProvider).reschedule(submission, publishAt);
+  ref.invalidate(announcementsProvider);
+  ref.invalidate(eventsProvider);
+  ref.invalidate(nextEventProvider);
+  ref.invalidate(publisherSubmissionsProvider);
+}

@@ -13,6 +13,21 @@ abstract final class AppConstants {
   );
   static const bool hasExplicitApiBaseUrl = bool.hasEnvironment('API_BASE_URL');
 
+  /// Firebase Cloud Messaging values for device push notifications, from
+  /// your Firebase project's Android app settings. Pass all four with
+  /// `--dart-define`; without them push stays off and the in-app
+  /// notification list works as before.
+  static const String firebaseApiKey = String.fromEnvironment('FIREBASE_API_KEY');
+  static const String firebaseAppId = String.fromEnvironment('FIREBASE_APP_ID');
+  static const String firebaseSenderId =
+      String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+  static const String firebaseProjectId =
+      String.fromEnvironment('FIREBASE_PROJECT_ID');
+  static const bool pushConfigured = firebaseApiKey != '' &&
+      firebaseAppId != '' &&
+      firebaseSenderId != '' &&
+      firebaseProjectId != '';
+
   /// Simulated latency for the `Mock*Repository` classes (used by
   /// `test/smoke_test.dart` to stay network-free — see `providers/repositories.dart`
   /// for the real Http* wiring the app runs on).

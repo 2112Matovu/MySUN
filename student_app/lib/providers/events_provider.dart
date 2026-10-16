@@ -64,3 +64,14 @@ final eventProvider =
     FutureProvider.autoDispose.family<Event, String>((ref, id) async {
   return ref.watch(eventRepositoryProvider).getById(id);
 });
+
+/// Ids of events the signed-in user registered for. Signed-out users (or a
+/// failed lookup) simply have none, so the detail screen still renders.
+final myRegistrationsProvider =
+    FutureProvider.autoDispose<Set<String>>((ref) async {
+  try {
+    return await ref.watch(eventRepositoryProvider).myRegistrations();
+  } catch (_) {
+    return const <String>{};
+  }
+});

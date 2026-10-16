@@ -13,6 +13,7 @@ class Event {
     this.capacity,
     this.registeredCount = 0,
     this.isFeatured = false,
+    this.publishAt,
   });
 
   final String id;
@@ -28,21 +29,43 @@ class Event {
   final int registeredCount;
   final bool isFeatured;
 
+  /// When a scheduled event goes live; null = published immediately.
+  final DateTime? publishAt;
+
+  Event copyWith({int? registeredCount}) => Event(
+        id: id,
+        title: title,
+        description: description,
+        category: category,
+        organizerName: organizerName,
+        dateTime: dateTime,
+        venue: venue,
+        endDateTime: endDateTime,
+        imageUrl: imageUrl,
+        capacity: capacity,
+        registeredCount: registeredCount ?? this.registeredCount,
+        isFeatured: isFeatured,
+        publishAt: publishAt,
+      );
+
   factory Event.fromJson(Map<String, dynamic> json) => Event(
         id: json['id'] as String,
         title: json['title'] as String,
         description: json['description'] as String,
         category: json['category'] as String,
         organizerName: json['organizer_name'] as String? ?? 'Soroti University',
-        dateTime: DateTime.parse(json['date_time'] as String),
+        dateTime: DateTime.parse(json['date_time'] as String).toLocal(),
         venue: json['venue'] as String,
         endDateTime: json['end_date_time'] == null
             ? null
-            : DateTime.parse(json['end_date_time'] as String),
+            : DateTime.parse(json['end_date_time'] as String).toLocal(),
         imageUrl: json['image_url'] as String?,
         capacity: json['capacity'] as int?,
         registeredCount: json['registered_count'] as int? ?? 0,
         isFeatured: json['is_featured'] as bool? ?? false,
+        publishAt: json['publish_at'] == null
+            ? null
+            : DateTime.parse(json['publish_at'] as String).toLocal(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -58,6 +81,7 @@ class Event {
         'capacity': capacity,
         'registered_count': registeredCount,
         'is_featured': isFeatured,
+        'publish_at': publishAt?.toIso8601String(),
       };
 
   /// True once the event's end time has passed (or its start time, for

@@ -38,6 +38,15 @@ abstract interface class EventRepository {
 
   /// Admin removal for content that breaks the terms of service (§5.1).
   Future<void> delete(String id);
+
+  /// Ids of the events the signed-in user has registered for.
+  Future<Set<String>> myRegistrations();
+
+  /// Registers the user and returns the event's new registered count.
+  /// Throws [ApiException] when the event is full.
+  Future<int> register(String eventId);
+
+  Future<int> unregister(String eventId);
 }
 
 class MockEventRepository implements EventRepository {
@@ -159,6 +168,39 @@ class MockEventRepository implements EventRepository {
     await Future<void>.delayed(AppConstants.mockLatency);
     _events.removeWhere((e) => e.id == id);
   }
+
+  static final Set<String> _registered = {};
+
+  @override
+  Future<Set<String>> myRegistrations() async => {..._registered};
+
+  @override
+  Future<int> register(String eventId) async {
+    await Future<void>.delayed(AppConstants.mockLatency);
+    final i = _events.indexWhere((e) => e.id == eventId);
+    if (i < 0) throw const ApiException('Event not found');
+    final e = _events[i];
+    if (!_registered.add(eventId)) return e.registeredCount;
+    if (e.capacity != null && e.registeredCount >= e.capacity!) {
+      _registered.remove(eventId);
+      throw const ApiException('This event is full');
+    }
+    final next = e.registeredCount + 1;
+    _events[i] = e.copyWith(registeredCount: next);
+    return next;
+  }
+
+  @override
+  Future<int> unregister(String eventId) async {
+    await Future<void>.delayed(AppConstants.mockLatency);
+    final i = _events.indexWhere((e) => e.id == eventId);
+    if (i < 0) throw const ApiException('Event not found');
+    final e = _events[i];
+    if (!_registered.remove(eventId)) return e.registeredCount;
+    final next = e.registeredCount > 0 ? e.registeredCount - 1 : 0;
+    _events[i] = e.copyWith(registeredCount: next);
+    return next;
+  }
 }
 
 class HttpEventRepository implements EventRepository {
@@ -274,9 +316,11 @@ class HttpEventRepository implements EventRepository {
         'description': event.description,
         'category': event.category,
         'organizer_name': event.organizerName,
-        'date_time': event.dateTime.toIso8601String(),
+        // UTC with an offset, so the server reads the instant the user picked.
+        'date_time': event.dateTime.toUtc().toIso8601String(),
         'venue': event.venue,
-        'end_date_time': event.endDateTime?.toIso8601String(),
+        'end_date_time': event.endDateTime?.toUtc().toIso8601String(),
+        'publish_at': event.publishAt?.toUtc().toIso8601String(),
         'image_url': event.imageUrl,
         'capacity': event.capacity,
         'is_featured': event.isFeatured,
@@ -295,4 +339,30 @@ class HttpEventRepository implements EventRepository {
       throw mapDioError(e);
     }
   }
+
+  @override
+  Future<Set<String>> myRegistrations() async {
+    try {
+      final res = await _dio.get('/events/registrations/mine');
+      return (res.data as List).cast<String>().toSet();
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  Future<int> _toggle(String method, String eventId) async {
+    try {
+      final res = await _dio.request('/events/$eventId/register',
+          options: Options(method: method));
+      return (res.data as Map<String, dynamic>)['registered_count'] as int;
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<int> register(String eventId) => _toggle('POST', eventId);
+
+  @override
+  Future<int> unregister(String eventId) => _toggle('DELETE', eventId);
 }

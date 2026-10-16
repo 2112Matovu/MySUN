@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mysun_app/data/mock/mock_data.dart';
 import 'package:mysun_app/data/models/user_profile.dart';
 import 'package:mysun_app/data/repositories/auth_repository.dart';
+import 'package:mysun_app/core/push/push_service.dart';
 import 'package:mysun_app/providers/repositories.dart';
 import 'package:mysun_app/providers/settings_provider.dart';
 
@@ -116,6 +117,8 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // While the token still works, so this phone stops getting this user's pushes.
+    await ref.read(pushServiceProvider).unregister();
     await _repo.logout();
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.setBool(_kLoggedIn, false);

@@ -10,35 +10,24 @@ final sharedPreferencesProvider = Provider<SharedPreferences>(
 class SettingsState {
   const SettingsState({
     this.themeMode = ThemeMode.system,
-    this.notificationsEnabled = true,
-    this.eventRemindersEnabled = true,
     this.followedCategories = const {},
   });
 
   final ThemeMode themeMode;
-  final bool notificationsEnabled;
-  final bool eventRemindersEnabled;
   final Set<String> followedCategories;
 
   SettingsState copyWith({
     ThemeMode? themeMode,
-    bool? notificationsEnabled,
-    bool? eventRemindersEnabled,
     Set<String>? followedCategories,
   }) =>
       SettingsState(
         themeMode: themeMode ?? this.themeMode,
-        notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
-        eventRemindersEnabled:
-            eventRemindersEnabled ?? this.eventRemindersEnabled,
         followedCategories: followedCategories ?? this.followedCategories,
       );
 }
 
 class SettingsNotifier extends Notifier<SettingsState> {
   static const _kTheme = 'theme_mode';
-  static const _kNotifications = 'notifications_enabled';
-  static const _kReminders = 'event_reminders_enabled';
   static const _kCategories = 'followed_categories';
 
   SharedPreferences get _prefs => ref.read(sharedPreferencesProvider);
@@ -52,8 +41,6 @@ class SettingsNotifier extends Notifier<SettingsState> {
         'dark' => ThemeMode.dark,
         _ => ThemeMode.system,
       },
-      notificationsEnabled: prefs.getBool(_kNotifications) ?? true,
-      eventRemindersEnabled: prefs.getBool(_kReminders) ?? true,
       followedCategories:
           (prefs.getStringList(_kCategories) ?? const <String>[]).toSet(),
     );
@@ -62,16 +49,6 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setThemeMode(ThemeMode mode) async {
     await _prefs.setString(_kTheme, mode.name);
     state = state.copyWith(themeMode: mode);
-  }
-
-  Future<void> setNotificationsEnabled(bool value) async {
-    await _prefs.setBool(_kNotifications, value);
-    state = state.copyWith(notificationsEnabled: value);
-  }
-
-  Future<void> setEventRemindersEnabled(bool value) async {
-    await _prefs.setBool(_kReminders, value);
-    state = state.copyWith(eventRemindersEnabled: value);
   }
 
   Future<void> toggleCategory(String category) async {

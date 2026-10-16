@@ -49,6 +49,10 @@ abstract interface class PublisherRepository {
   /// Self-service removal of one of THIS publisher's own live listings —
   /// distinct from [markRemoved] (§4.5).
   Future<PublisherSubmission> removeOwn(String id);
+
+  /// Moves a still-scheduled announcement or event to [publishAt], or
+  /// publishes it right away when [publishAt] is null.
+  Future<void> reschedule(PublisherSubmission submission, DateTime? publishAt);
 }
 
 class MockPublisherRepository implements PublisherRepository {
@@ -208,6 +212,19 @@ class MockPublisherRepository implements PublisherRepository {
   @override
   Future<PublisherSubmission> removeOwn(String id) =>
       markRemoved(id, reason: 'Removed by the publisher.');
+
+  @override
+  Future<void> reschedule(
+      PublisherSubmission submission, DateTime? publishAt) async {
+    await Future<void>.delayed(AppConstants.mockLatency);
+    final i = _submissions.indexWhere((s) => s.id == submission.id);
+    if (i < 0) return;
+    _submissions[i] = publishAt == null
+        ? _submissions[i].copyWith(
+            status: SubmissionStatus.published, updatedAt: DateTime.now())
+        : _submissions[i]
+            .copyWith(publishAt: publishAt, updatedAt: DateTime.now());
+  }
 }
 
 class HttpPublisherRepository implements PublisherRepository {
@@ -325,6 +342,26 @@ class HttpPublisherRepository implements PublisherRepository {
     try {
       final res = await _dio.post('/publisher/submissions/$id/remove');
       return PublisherSubmission.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<void> reschedule(
+      PublisherSubmission submission, DateTime? publishAt) async {
+    final contentId = submission.contentId;
+    final collection = switch (submission.type) {
+      SubmissionType.announcement => 'announcements',
+      SubmissionType.event => 'events',
+      _ => null,
+    };
+    if (contentId == null || collection == null) {
+      throw const ApiException('Only announcements and events can be scheduled');
+    }
+    try {
+      await _dio.patch('/$collection/$contentId/schedule',
+          data: {'publish_at': publishAt?.toUtc().toIso8601String()});
     } on DioException catch (e) {
       throw mapDioError(e);
     }

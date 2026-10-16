@@ -9,6 +9,7 @@ import 'package:mysun_app/providers/events_provider.dart';
 import 'package:mysun_app/providers/publisher_provider.dart';
 import 'package:mysun_app/providers/repositories.dart';
 import 'package:mysun_app/widgets/image_upload_helper.dart';
+import 'package:mysun_app/widgets/schedule_picker.dart';
 
 const _organizers = [
   'Student Affairs Office',
@@ -56,6 +57,9 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       : TimeOfDay(
           hour: _form!['endHour'] as int, minute: _form!['endMinute'] as int);
   late String? _imageUrl = _form?['imageUrl'] as String?;
+  late DateTime? _publishAt = _form?['publishAt'] == null
+      ? null
+      : DateTime.parse(_form!['publishAt'] as String);
   bool _saving = false;
   bool _uploadingImage = false;
 
@@ -73,6 +77,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
         'endHour': _endTime?.hour,
         'endMinute': _endTime?.minute,
         'imageUrl': _imageUrl,
+        'publishAt': _publishAt?.toIso8601String(),
       };
 
   Future<void> _pickImage() async {
@@ -132,6 +137,15 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
             ? null
             : DateTime(_startDate!.year, _startDate!.month, _startDate!.day,
                 _endTime!.hour, _endTime!.minute);
+        if (_publishAt != null) {
+          if (_publishAt!
+              .isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+            throw 'That time has passed. Pick a new one or publish now.';
+          }
+          if (!start.isAfter(_publishAt!)) {
+            throw 'The event would start before it goes live';
+          }
+        }
         final saved = await ref.read(eventRepositoryProvider).create(
               Event(
                 id: '',
@@ -143,6 +157,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 endDateTime: end,
                 venue: _location.text.trim(),
                 imageUrl: _imageUrl,
+                publishAt: _publishAt,
               ),
             );
         await publisherRepo.publish(
@@ -172,7 +187,11 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(submit ? 'Published to Events' : 'Draft saved'),
+      content: Text(!submit
+          ? 'Draft saved'
+          : _publishAt == null
+              ? 'Published to Events'
+              : 'Scheduled for ${describeSchedule(_publishAt!)}'),
     ));
     context.pop();
   }
@@ -298,7 +317,12 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                     : const Icon(Icons.add_photo_alternate_outlined),
                 label: Text(_imageUrl == null ? 'Event Image' : 'Replace Image'),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              SchedulePicker(
+                value: _publishAt,
+                onChanged: (v) => setState(() => _publishAt = v),
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -318,7 +342,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('Publish'),
+                          : Text(_publishAt == null ? 'Publish' : 'Schedule'),
                     ),
                   ),
                 ],

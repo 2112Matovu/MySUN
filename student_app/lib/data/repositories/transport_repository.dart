@@ -27,6 +27,16 @@ abstract interface class TransportRepository {
 
   /// Admin removal for content that breaks the terms of service (§5.1).
   Future<void> delete(String id);
+
+  /// Admin-only: the one way a listing becomes (or stops being) verified.
+  Future<TransportProvider> setVerified(String id, bool verified);
+
+  /// Rates a rider 1-5 (one rating per user; rating again replaces it) and
+  /// returns the rider with its refreshed average.
+  Future<TransportProvider> rate(String id, int stars, {String? comment});
+
+  /// The signed-in user's earlier rating of this rider, if any.
+  Future<int?> myRating(String id);
 }
 
 class MockTransportRepository implements TransportRepository {
@@ -78,6 +88,36 @@ class MockTransportRepository implements TransportRepository {
   Future<void> delete(String id) async {
     await Future<void>.delayed(AppConstants.mockLatency);
     _providers.removeWhere((p) => p.id == id);
+  }
+
+  @override
+  Future<TransportProvider> setVerified(String id, bool verified) async {
+    await Future<void>.delayed(AppConstants.mockLatency);
+    final i = _providers.indexWhere((p) => p.id == id);
+    if (i < 0) throw const ApiException('Provider not found');
+    return _providers[i] = _providers[i].copyWith(isVerified: verified);
+  }
+
+  static final Map<String, int> _myRatings = {};
+
+  @override
+  Future<int?> myRating(String id) async => _myRatings[id];
+
+  @override
+  Future<TransportProvider> rate(String id, int stars,
+      {String? comment}) async {
+    await Future<void>.delayed(AppConstants.mockLatency);
+    final i = _providers.indexWhere((p) => p.id == id);
+    if (i < 0) throw const ApiException('Provider not found');
+    final p = _providers[i];
+    final previous = _myRatings[id];
+    final total = p.rating * p.ratingCount - (previous ?? 0) + stars;
+    final count = previous == null ? p.ratingCount + 1 : p.ratingCount;
+    _myRatings[id] = stars;
+    return _providers[i] = p.copyWith(
+      rating: double.parse((total / count).toStringAsFixed(1)),
+      ratingCount: count,
+    );
   }
 
   @override
@@ -198,5 +238,38 @@ class HttpTransportRepository implements TransportRepository {
     } on DioException catch (e) {
       throw mapDioError(e);
     }
+  }
+
+  @override
+  Future<TransportProvider> setVerified(String id, bool verified) async {
+    try {
+      final res = await _dio.patch('/admin/transport/$id/verified',
+          data: {'is_verified': verified});
+      return TransportProvider.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<int?> myRating(String id) async {
+    try {
+      final res = await _dio.get('/transport/$id/my-rating');
+      return (res.data as Map<String, dynamic>)['stars'] as int?;
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<TransportProvider> rate(String id, int stars,
+      {String? comment}) async {
+    try {
+      await _dio.post('/transport/$id/rate',
+          data: {'stars': stars, 'comment': comment});
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+    return getProvider(id);
   }
 }

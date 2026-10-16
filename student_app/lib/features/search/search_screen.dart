@@ -4,35 +4,22 @@ import 'package:go_router/go_router.dart';
 
 import 'package:mysun_app/core/constants/categories.dart';
 import 'package:mysun_app/core/utils/date_fmt.dart';
-import 'package:mysun_app/data/models/announcement.dart';
-import 'package:mysun_app/data/models/event.dart';
-import 'package:mysun_app/data/models/transport_provider.dart';
+import 'package:mysun_app/data/repositories/search_repository.dart';
 import 'package:mysun_app/providers/repositories.dart';
 import 'package:mysun_app/widgets/state_views.dart';
 
 final _queryProvider = StateProvider.autoDispose<String>((ref) => '');
 
-class _Results {
-  const _Results(this.announcements, this.events, this.transport);
-  final List<Announcement> announcements;
-  final List<Event> events;
-  final List<TransportProvider> transport;
-
-  bool get isEmpty =>
-      announcements.isEmpty && events.isEmpty && transport.isEmpty;
-  int get total => announcements.length + events.length + transport.length;
-}
-
-final _searchProvider = FutureProvider.autoDispose<_Results>((ref) async {
+final _searchProvider = FutureProvider.autoDispose<SearchResults>((ref) async {
   final q = ref.watch(_queryProvider).trim();
-  if (q.length < 2) return const _Results([], [], []);
-
-  final announcements =
-      await ref.watch(announcementRepositoryProvider).search(q);
-  final events = await ref.watch(eventRepositoryProvider).search(q);
-  final transport = await ref.watch(transportRepositoryProvider).search(q);
-
-  return _Results(announcements, events, transport);
+  if (q.length < 2) return const SearchResults();
+  // Wait briefly so a result isn't fetched for every keystroke; a newer
+  // keystroke disposes this provider run before the request is sent.
+  var cancelled = false;
+  ref.onDispose(() => cancelled = true);
+  await Future<void>.delayed(const Duration(milliseconds: 350));
+  if (cancelled) return const SearchResults();
+  return ref.read(searchRepositoryProvider).search(q);
 });
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -85,7 +72,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       body: query.trim().length < 2
           ? const EmptyState(
               icon: Icons.search,
-              title: 'Search announcements, events & transport',
+              title: 'Search announcements, events, housing & transport',
               message: 'Type at least two characters.',
             )
           : results.when(
@@ -123,6 +110,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             '${DateFmt.dayLabel(e.dateTime)} • ${e.venue}',
                             maxLines: 1, overflow: TextOverflow.ellipsis),
                         onTap: () => context.push('/event/${e.id}'),
+                      ),
+                    _GroupHeader('Accommodation', r.accommodation.length),
+                    for (final l in r.accommodation)
+                      ListTile(
+                        leading: const Icon(Icons.home_work_outlined),
+                        title: Text(l.name,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text('${l.type.label} • ${l.location}',
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        onTap: () => context.push('/accommodation/${l.id}'),
                       ),
                     _GroupHeader('Transport', r.transport.length),
                     for (final t in r.transport)

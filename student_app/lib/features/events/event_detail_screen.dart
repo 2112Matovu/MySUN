@@ -1,7 +1,10 @@
+import 'package:add_2_calendar/add_2_calendar.dart' as cal;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mysun_app/core/utils/date_fmt.dart';
+import 'package:mysun_app/providers/repositories.dart';
 import 'package:mysun_app/data/models/event.dart';
 import 'package:mysun_app/providers/bookmarks_provider.dart';
 import 'package:mysun_app/providers/events_provider.dart';
@@ -19,7 +22,58 @@ class EventDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
-  bool _reminderSet = false;
+  bool _busy = false;
+
+  Future<void> _toggleRegistration(Event event, bool registered) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      final repo = ref.read(eventRepositoryProvider);
+      if (registered) {
+        await repo.unregister(event.id);
+      } else {
+        await repo.register(event.id);
+      }
+      ref.invalidate(eventProvider(event.id));
+      ref.invalidate(myRegistrationsProvider);
+      messenger.showSnackBar(SnackBar(
+        content: Text(registered
+            ? 'Registration cancelled'
+            : "You're registered. Add it to your calendar so you don't miss it."),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Opens the phone's calendar with the event pre-filled; the user confirms
+  /// and the calendar app applies its reminder. iOS gets a 1-hour alert.
+  Future<void> _addToCalendar(Event event) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (kIsWeb) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Adding to a calendar works in the phone app.')));
+      return;
+    }
+    var opened = false;
+    try {
+      opened = await cal.Add2Calendar.addEvent2Cal(cal.Event(
+        title: event.title,
+        description: event.description,
+        location: event.venue,
+        startDate: event.dateTime,
+        endDate:
+            event.endDateTime ?? event.dateTime.add(const Duration(hours: 1)),
+        iosParams: const cal.IOSParams(reminder: Duration(hours: 1)),
+      ));
+    } catch (_) {}
+    if (!opened) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text("Couldn't open your calendar app.")));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -143,24 +197,22 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         },
       ),
       bottomSheet: async.maybeWhen(
-        data: (event) => _ActionBar(
-          event: event,
-          reminderSet: _reminderSet,
-          onReminderToggle: () {
-            setState(() => _reminderSet = !_reminderSet);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(_reminderSet
-                    ? 'Reminder set for ${DateFmt.dayLabel(event.dateTime)}'
-                    : 'Reminder removed'),
-              ),
-            );
-          },
-          onAddToCalendar: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text("Calendar export isn't available yet.")),
-          ),
-        ),
+        data: (event) {
+          final registered =
+              ref.watch(myRegistrationsProvider).valueOrNull?.contains(event.id) ??
+                  false;
+          final full = event.capacity != null &&
+              event.registeredCount >= event.capacity! &&
+              !registered;
+          return _ActionBar(
+            event: event,
+            registered: registered,
+            full: full,
+            busy: _busy,
+            onRegister: () => _toggleRegistration(event, registered),
+            onAddToCalendar: () => _addToCalendar(event),
+          );
+        },
         orElse: () => const SizedBox.shrink(),
       ),
     );
@@ -280,14 +332,18 @@ class _CountdownChip extends StatelessWidget {
 class _ActionBar extends StatelessWidget {
   const _ActionBar({
     required this.event,
-    required this.reminderSet,
-    required this.onReminderToggle,
+    required this.registered,
+    required this.full,
+    required this.busy,
+    required this.onRegister,
     required this.onAddToCalendar,
   });
 
   final Event event;
-  final bool reminderSet;
-  final VoidCallback onReminderToggle;
+  final bool registered;
+  final bool full;
+  final bool busy;
+  final VoidCallback onRegister;
   final VoidCallback onAddToCalendar;
 
   @override
@@ -301,11 +357,9 @@ class _ActionBar extends StatelessWidget {
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: event.isPast ? null : onReminderToggle,
-              icon: Icon(reminderSet
-                  ? Icons.notifications_active
-                  : Icons.notifications_none),
-              label: Text(reminderSet ? 'Reminder on' : 'Remind me'),
+              onPressed: event.isPast ? null : onAddToCalendar,
+              icon: const Icon(Icons.calendar_month),
+              label: const Text('Add to calendar'),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
               ),
@@ -314,9 +368,17 @@ class _ActionBar extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton.icon(
-              onPressed: onAddToCalendar,
-              icon: const Icon(Icons.calendar_month),
-              label: const Text('Add to calendar'),
+              onPressed:
+                  (event.isPast || full || busy) ? null : onRegister,
+              icon: Icon(registered ? Icons.event_busy : Icons.how_to_reg),
+              label: Text(full
+                  ? 'Event full'
+                  : registered
+                      ? 'Cancel registration'
+                      : 'Register'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+              ),
             ),
           ),
         ],

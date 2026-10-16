@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:mysun_app/core/utils/date_fmt.dart';
+import 'package:mysun_app/widgets/schedule_picker.dart';
 import 'package:mysun_app/data/models/publisher_submission.dart';
 import 'package:mysun_app/providers/auth_provider.dart';
 import 'package:mysun_app/providers/publisher_provider.dart';
@@ -156,6 +157,32 @@ class _SubmissionTile extends ConsumerWidget {
     }
   }
 
+  Future<void> _scheduledAction(
+      BuildContext context, WidgetRef ref, String action) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      switch (action) {
+        case 'move':
+          final when = await pickFutureDateTime(context,
+              initial: submission.publishAt);
+          if (when == null) return;
+          await rescheduleMyContent(ref, submission, when);
+          messenger.showSnackBar(SnackBar(
+              content: Text('Moved to ${describeSchedule(when)}')));
+        case 'now':
+          await rescheduleMyContent(ref, submission, null);
+          messenger.showSnackBar(
+              const SnackBar(content: Text('Published')));
+        case 'cancel':
+          await removeMyContent(ref, submission);
+          messenger.showSnackBar(
+              const SnackBar(content: Text('Schedule cancelled')));
+      }
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDraft = submission.status == SubmissionStatus.draft;
@@ -163,7 +190,9 @@ class _SubmissionTile extends ConsumerWidget {
     // self-service, separate from admin moderation).
     final canRemove = submission.status == SubmissionStatus.published &&
         submission.type == SubmissionType.transport;
+    final isScheduled = submission.status == SubmissionStatus.scheduled;
     final (icon, color, label) = switch (submission.status) {
+      SubmissionStatus.scheduled => (Icons.schedule, Colors.orange, 'Scheduled'),
       SubmissionStatus.published => (Icons.check_circle, Colors.green, 'Live'),
       SubmissionStatus.removed => (Icons.cancel, Colors.red, 'Removed'),
       SubmissionStatus.draft => (Icons.edit_note, Colors.grey, 'Draft'),
@@ -177,9 +206,19 @@ class _SubmissionTile extends ConsumerWidget {
           submission.status == SubmissionStatus.removed &&
                   submission.removalReason != null
               ? submission.removalReason!
-              : '$label • ${DateFmt.relative(submission.updatedAt)}',
+              : isScheduled && submission.publishAt != null
+                  ? 'Goes live ${describeSchedule(submission.publishAt!)}'
+                  : '$label • ${DateFmt.relative(submission.updatedAt)}',
         ),
         trailing: switch ((isDraft, canRemove)) {
+          _ when isScheduled => PopupMenuButton<String>(
+              onSelected: (action) => _scheduledAction(context, ref, action),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'move', child: Text('Change time')),
+                PopupMenuItem(value: 'now', child: Text('Publish now')),
+                PopupMenuItem(value: 'cancel', child: Text('Cancel schedule')),
+              ],
+            ),
           (true, _) => const Icon(Icons.chevron_right),
           (_, true) => IconButton(
               icon: const Icon(Icons.delete_outline),

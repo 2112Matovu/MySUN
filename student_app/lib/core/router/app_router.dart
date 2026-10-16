@@ -32,6 +32,7 @@ import 'package:mysun_app/features/services/accommodation_detail_screen.dart';
 import 'package:mysun_app/features/services/services_hub_screen.dart';
 import 'package:mysun_app/features/shell/main_shell.dart';
 import 'package:mysun_app/features/splash/splash_screen.dart';
+import 'package:mysun_app/features/transport/bookings_screen.dart';
 import 'package:mysun_app/features/transport/bus_schedule_screen.dart';
 import 'package:mysun_app/providers/auth_provider.dart';
 
@@ -150,6 +151,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/search',
         builder: (context, state) => const SearchScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/bookings',
+        builder: (context, state) => const BookingsScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

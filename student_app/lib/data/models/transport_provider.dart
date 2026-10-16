@@ -14,6 +14,20 @@ class TransportProvider {
     this.serviceAreas = const [],
   });
 
+  TransportProvider copyWith({bool? isVerified, double? rating, int? ratingCount}) => TransportProvider(
+        id: id,
+        name: name,
+        phoneNumber: phoneNumber,
+        serviceType: serviceType,
+        contactPerson: contactPerson,
+        imageUrl: imageUrl,
+        isVerified: isVerified ?? this.isVerified,
+        rating: rating ?? this.rating,
+        ratingCount: ratingCount ?? this.ratingCount,
+        operatingHours: operatingHours,
+        serviceAreas: serviceAreas,
+      );
+
   final String id;
   final String name;
   final String phoneNumber;

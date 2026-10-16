@@ -2,6 +2,8 @@
     <!-- Needed for the campus feed's network images (lib/widgets/network_image_box.dart)
          and for the future FastAPI backend calls (spec §5.3). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ asks before showing push notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Camera capture for publishing forms' "Add Image" (image_picker) —
          gallery picks go through the system Photo Picker and need no
          permission declaration on modern Android. -->
@@ -46,6 +48,10 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

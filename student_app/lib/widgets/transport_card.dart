@@ -4,11 +4,18 @@ import 'package:mysun_app/core/constants/categories.dart';
 import 'package:mysun_app/data/models/transport_provider.dart';
 
 class TransportCard extends StatelessWidget {
-  const TransportCard(this.provider, {super.key, this.onCall, this.onTap});
+  const TransportCard(this.provider, {super.key, this.onCall, this.onTap, this.onToggleVerified, this.onRate, this.onBook});
 
   final TransportProvider provider;
   final VoidCallback? onCall;
   final VoidCallback? onTap;
+
+  /// Set only for admins: shows a Verify / Remove-verification action.
+  final VoidCallback? onToggleVerified;
+
+  /// Rate this rider / request a ride (signed-in users).
+  final VoidCallback? onRate;
+  final VoidCallback? onBook;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +124,44 @@ class TransportCard extends StatelessWidget {
                             style: theme.textTheme.labelSmall),
                       ),
                   ],
+                ),
+              ],
+              if (onRate != null || onBook != null) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (onRate != null)
+                      TextButton.icon(
+                        onPressed: onRate,
+                        icon: const Icon(Icons.star_outline_rounded, size: 18),
+                        label: const Text('Rate'),
+                      ),
+                    if (onBook != null)
+                      TextButton.icon(
+                        onPressed: onBook,
+                        icon: const Icon(Icons.event_available_outlined,
+                            size: 18),
+                        label: const Text('Book'),
+                      ),
+                  ],
+                ),
+              ],
+              if (onToggleVerified != null) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: onToggleVerified,
+                    icon: Icon(
+                        provider.isVerified
+                            ? Icons.remove_moderator_outlined
+                            : Icons.verified_outlined,
+                        size: 18),
+                    label: Text(provider.isVerified
+                        ? 'Remove verification'
+                        : 'Mark as verified'),
+                  ),
                 ),
               ],
               const SizedBox(height: 12),

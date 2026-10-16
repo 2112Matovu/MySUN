@@ -110,10 +110,12 @@ class HttpAnnouncementRepository implements AnnouncementRepository {
   /// Unfiltered fetch (including expired ones) — [byIds] and [search] use
   /// this directly so a bookmarked or matched announcement doesn't vanish
   /// just because it expired, same as how past events still show up there.
-  Future<List<Announcement>> _all({String? category}) async {
+  Future<List<Announcement>> _all(
+      {String? category, bool includeExpired = true}) async {
     try {
       final res = await _dio.get('/announcements', queryParameters: {
         if (category != null && category != 'All') 'category': category,
+        if (includeExpired) 'include_expired': true,
       });
       return (res.data as List)
           .map((e) => Announcement.fromJson(e as Map<String, dynamic>))
@@ -129,8 +131,9 @@ class HttpAnnouncementRepository implements AnnouncementRepository {
     int limit = AppConstants.pageSize,
     int offset = 0,
   }) async {
-    final items =
-        (await _all(category: category)).where((a) => !a.isExpired).toList();
+    final items = (await _all(category: category, includeExpired: false))
+        .where((a) => !a.isExpired)
+        .toList();
     if (offset >= items.length) return const [];
     return items.sublist(offset, (offset + limit).clamp(0, items.length));
   }
@@ -178,7 +181,10 @@ class HttpAnnouncementRepository implements AnnouncementRepository {
         'department': announcement.publisherName,
         'is_important': announcement.isImportant,
         'image_url': announcement.imageUrl,
-        'expires_at': announcement.expiresAt?.toIso8601String(),
+        // Always UTC with an offset, so the server reads the same instant
+        // the user picked regardless of its own timezone.
+        'expires_at': announcement.expiresAt?.toUtc().toIso8601String(),
+        'publish_at': announcement.publishAt?.toUtc().toIso8601String(),
       });
       return Announcement.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {

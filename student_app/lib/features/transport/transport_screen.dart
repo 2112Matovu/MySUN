@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:mysun_app/core/utils/date_fmt.dart';
+import 'package:mysun_app/core/utils/phone_launcher.dart';
+import 'package:mysun_app/features/transport/rate_and_book.dart';
+import 'package:mysun_app/providers/auth_provider.dart';
+import 'package:mysun_app/providers/repositories.dart';
 import 'package:mysun_app/providers/transport_providers.dart';
 import 'package:mysun_app/widgets/state_views.dart';
 import 'package:mysun_app/widgets/transport_card.dart';
@@ -18,6 +22,7 @@ class TransportSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final providers = ref.watch(transportProvidersProvider);
+    final canVerify = ref.watch(currentUserProvider).role.isAdminLevel;
 
     return RefreshIndicator(
         onRefresh: () async {
@@ -28,12 +33,25 @@ class TransportSection extends ConsumerWidget {
         child: CustomScrollView(
           slivers: [
             const SliverToBoxAdapter(child: _NextBusCard()),
+            SliverToBoxAdapter(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: TextButton.icon(
+                    onPressed: () => context.push('/bookings'),
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: const Text('My bookings'),
+                  ),
+                ),
+              ),
+            ),
             const SliverToBoxAdapter(child: _BodaSearchField()),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
                 child: Text(
-                  'Verified boda riders',
+                  'Boda riders',
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
@@ -73,11 +91,24 @@ class TransportSection extends ConsumerWidget {
                   itemCount: items.length,
                   itemBuilder: (context, i) => TransportCard(
                     items[i],
-                    onCall: () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Would call ${items[i].phoneNumber}'),
-                      ),
-                    ),
+                    onCall: () => callNumber(context, items[i].phoneNumber),
+                    onRate: () => showRateDialog(context, ref, items[i]),
+                    onBook: () => showBookingSheet(context, ref, items[i]),
+                    onToggleVerified: canVerify
+                        ? () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            try {
+                              await ref
+                                  .read(transportRepositoryProvider)
+                                  .setVerified(
+                                      items[i].id, !items[i].isVerified);
+                              ref.invalidate(transportProvidersProvider);
+                            } catch (e) {
+                              messenger
+                                  .showSnackBar(SnackBar(content: Text('$e')));
+                            }
+                          }
+                        : null,
                   ),
                 );
               },

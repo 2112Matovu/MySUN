@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:mysun_app/core/utils/phone_launcher.dart';
 import 'package:mysun_app/data/models/accommodation_listing.dart';
 import 'package:mysun_app/providers/accommodation_providers.dart';
 import 'package:mysun_app/widgets/network_image_box.dart';
@@ -180,10 +181,7 @@ class _BodyState extends State<_Body> {
                             ?.copyWith(fontWeight: FontWeight.w600)),
                   ),
                   FilledButton.icon(
-                    onPressed: () => ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(
-                            content:
-                                Text('Would call ${listing.contactPhone}'))),
+                    onPressed: () => callNumber(context, listing.contactPhone),
                     icon: const Icon(Icons.call),
                     label: const Text('Call'),
                   ),

@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mysun_app/core/constants/app_constants.dart';
 import 'package:mysun_app/core/constants/categories.dart';
+import 'package:mysun_app/data/models/notification_prefs.dart';
 import 'package:mysun_app/providers/auth_provider.dart';
+import 'package:mysun_app/providers/notification_prefs_provider.dart';
 import 'package:mysun_app/providers/settings_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -84,20 +86,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const Divider(height: 24),
           const _SectionTitle('Notifications'),
-          SwitchListTile(
-            title: const Text('Push notifications'),
-            subtitle: const Text('Announcements, events and transport alerts'),
-            value: settings.notificationsEnabled,
-            onChanged: settingsNotifier.setNotificationsEnabled,
-          ),
-          SwitchListTile(
-            title: const Text('Event reminders'),
-            subtitle: const Text('Get nudged before events you saved'),
-            value: settings.eventRemindersEnabled,
-            onChanged: settings.notificationsEnabled
-                ? settingsNotifier.setEventRemindersEnabled
-                : null,
-          ),
+          const _NotificationCategorySwitches(),
           const Divider(height: 24),
           const _SectionTitle('Followed categories'),
           Padding(
@@ -249,6 +238,62 @@ class _ThemeModeSelector extends StatelessWidget {
               }),
               value: mode,
             ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// One switch per notification category, saved to the server. Moderation
+/// notices about your own content are always delivered.
+class _NotificationCategorySwitches extends ConsumerWidget {
+  const _NotificationCategorySwitches();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(notificationPrefsProvider);
+    final theme = Theme.of(context);
+
+    return prefs.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => ListTile(
+        leading: const Icon(Icons.error_outline),
+        title: const Text("Couldn't load notification settings"),
+        subtitle: Text('$e'),
+        trailing: TextButton(
+          onPressed: () => ref.invalidate(notificationPrefsProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (p) => Column(
+        children: [
+          for (final c in NotificationCategory.values)
+            SwitchListTile(
+              title: Text(c.title),
+              subtitle: Text(c.subtitle),
+              value: p.isOn(c),
+              onChanged: (v) async {
+                final messenger = ScaffoldMessenger.of(context);
+                final error =
+                    await ref.read(notificationPrefsProvider.notifier).set(c, v);
+                if (error != null) {
+                  messenger.showSnackBar(SnackBar(content: Text(error)));
+                }
+              },
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Text(
+              'Notices about content you published, such as a removal, are '
+              'always sent.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.outline),
+            ),
+          ),
         ],
       ),
     );

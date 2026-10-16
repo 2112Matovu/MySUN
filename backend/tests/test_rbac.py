@@ -46,6 +46,7 @@ PUBLISHER_ENDPOINTS = [
 ADMIN_LEVEL_ENDPOINTS = [
     ("GET", "/api/v1/admin/moderation", None),
     ("POST", "/api/v1/admin/moderation/abc/remove", {"reason": "spam"}),
+    ("PATCH", "/api/v1/admin/transport/abc/verified", {"is_verified": True}),
 ]
 
 SUPER_ADMIN_ENDPOINTS = [

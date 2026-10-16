@@ -6,9 +6,13 @@ from app.api.v1 import (
     announcements,
     auth,
     bookmarks,
+    bookings,
+    campus_services,
     events,
+    internal,
     notifications,
     publisher,
+    search,
     transport,
     uploads,
 )
@@ -24,3 +28,7 @@ api_router.include_router(notifications.router)
 api_router.include_router(publisher.router)
 api_router.include_router(admin.router)
 api_router.include_router(uploads.router)
+api_router.include_router(search.router)
+api_router.include_router(bookings.router)
+api_router.include_router(campus_services.router)
+api_router.include_router(internal.router)

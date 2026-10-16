@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import logging
 
 from fastapi import FastAPI, Request, status
@@ -22,7 +24,31 @@ if settings.sentry_dsn:
     sentry_sdk.init(dsn=settings.sentry_dsn, environment=settings.app_env, traces_sample_rate=0.1)
     logger.info("Sentry initialized", extra={"path": "startup"})
 
-app = FastAPI(title="MySun API", version="0.1.0")
+async def _reminder_loop() -> None:
+    """Releases scheduled posts and sends event reminders every 5 minutes. Each (event, user, reminder)
+    is logged in the database, so overlapping runs never double-send."""
+    from app.services.reminders import run_event_reminders
+    from app.services.scheduling import release_due_content
+
+    await asyncio.sleep(30)
+    while True:
+        try:
+            await asyncio.to_thread(release_due_content)
+            await asyncio.to_thread(run_event_reminders)
+        except Exception:
+            logger.exception("Event reminder run failed")
+        await asyncio.sleep(300)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_: FastAPI):
+    task = asyncio.create_task(_reminder_loop()) if settings.reminders_enabled else None
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(title="MySun API", version="0.1.0", lifespan=lifespan)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

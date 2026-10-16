@@ -8,7 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 SubmissionType = Literal["announcement", "event", "accommodation", "transport"]
-SubmissionStatus = Literal["draft", "published", "removed"]
+SubmissionStatus = Literal["draft", "scheduled", "published", "removed"]
 
 
 class DraftSave(BaseModel):
@@ -28,6 +28,7 @@ class PublisherSubmission(BaseModel):
     form_data: dict[str, Any] | None = None
     publisher_name: str | None = None
     removal_reason: str | None = None
+    publish_at: datetime | None = None  # set while status is scheduled
     updated_at: datetime
 
 

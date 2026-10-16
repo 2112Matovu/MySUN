@@ -20,6 +20,7 @@ class AnnouncementCreate(BaseModel):
     is_important: bool = False
     image_url: str | None = None
     expires_at: datetime | None = None
+    publish_at: datetime | None = None  # null = publish now
     draft_id: str | None = None  # set when publishing resumes a saved draft
 
 
@@ -33,6 +34,7 @@ class Announcement(BaseModel):
     is_important: bool = False
     image_url: str | None = None
     expires_at: datetime | None = None
+    publish_at: datetime | None = None
 
 
 class EventCreate(BaseModel):
@@ -46,6 +48,7 @@ class EventCreate(BaseModel):
     image_url: str | None = None
     capacity: int | None = None
     is_featured: bool = False
+    publish_at: datetime | None = None  # null = publish now
     draft_id: str | None = None
 
 
@@ -62,6 +65,7 @@ class Event(BaseModel):
     capacity: int | None = None
     registered_count: int = 0
     is_featured: bool = False
+    publish_at: datetime | None = None
 
 
 class AccommodationCreate(BaseModel):

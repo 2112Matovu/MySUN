@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends
 
 from app.core.security import require_admin_level, require_super_admin
 from app.core.supabase_client import get_supabase_admin
-from app.schemas.admin import AdminAnalytics, RemovalRequest, RoleGrantRequest
+from app.schemas.admin import AdminAnalytics, RemovalRequest, RoleGrantRequest, VerifyRequest
+from app.schemas.content import TransportProvider
 from app.schemas.publisher import PublisherSubmission
 from app.schemas.user import Role, UserProfile
 from app.services.publisher_service import remove_content, submissions_repo
@@ -17,7 +18,12 @@ def moderation_queue(_: UserProfile = Depends(require_admin_level)) -> list[dict
     """§5.3 Moderation Queue, adapted: publishing is immediate, so this is a
     review-and-remove list, not an approve/reject queue (§5.1). Open to both
     Super Admin and Minor Admin."""
-    return submissions_repo.list(order_by="updated_at", desc=True, status="published")
+    live = [
+        row
+        for status_ in ("published", "scheduled")
+        for row in submissions_repo.list(order_by="updated_at", desc=True, status=status_)
+    ]
+    return sorted(live, key=lambda r: r["updated_at"], reverse=True)
 
 
 @router.post("/moderation/{submission_id}/remove", response_model=PublisherSubmission)
@@ -25,7 +31,16 @@ def remove_submission(
     submission_id: str, body: RemovalRequest, _: UserProfile = Depends(require_admin_level)
 ) -> dict:
     submission = submissions_repo.get(submission_id)
-    return remove_content(submission, body.reason)
+    return remove_content(submission, body.reason, notify_publisher=True)
+
+
+@router.patch("/transport/{provider_id}/verified", response_model=TransportProvider)
+def set_transport_verified(
+    provider_id: str, body: VerifyRequest, _: UserProfile = Depends(require_admin_level)
+) -> dict:
+    """The only way a boda listing becomes verified; new listings start
+    unverified. Open to Super Admin and Minor Admin."""
+    return TableRepo("transport_providers").update(provider_id, {"is_verified": body.is_verified})
 
 
 @router.get("/users", response_model=list[UserProfile])

@@ -4,3 +4,8 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# Firebase / push credentials - never commit
+fcm-service-account*.json
+*-firebase-adminsdk-*.json
+google-services.json

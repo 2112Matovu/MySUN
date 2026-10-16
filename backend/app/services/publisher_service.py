@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
+from app.services.notify import notify_users
 from app.services.table_repo import TableRepo
 
 submissions_repo = TableRepo("publisher_submissions")
@@ -26,6 +27,7 @@ def record_publish(
     title: str,
     content_id: str,
     draft_id: str | None = None,
+    publish_at: str | None = None,
 ) -> dict:
     """Logs a just-created piece of content as published. If [draft_id]
     points at one of this publisher's own drafts, that row is converted in
@@ -34,7 +36,8 @@ def record_publish(
     payload = {
         "type": type,
         "title": title,
-        "status": "published",
+        "status": "scheduled" if publish_at else "published",
+        "publish_at": publish_at,
         "content_id": content_id,
         "publisher_name": publisher_name,
         "updated_at": _now(),
@@ -47,25 +50,38 @@ def record_publish(
     return submissions_repo.create(payload)
 
 
-def remove_content(submission: dict, reason: str) -> dict:
+def remove_content(submission: dict, reason: str, *, notify_publisher: bool = False) -> dict:
     """Deletes the real content row (if any) and marks the submission
     removed — used for both admin moderation and publisher self-removal."""
     content_id = submission.get("content_id")
     if content_id:
         table = CONTENT_TABLE_BY_TYPE[submission["type"]]
         TableRepo(table).delete(content_id)
-    return submissions_repo.update(
+    updated = submissions_repo.update(
         submission["id"],
         {"status": "removed", "removal_reason": reason, "updated_at": _now()},
     )
+    if notify_publisher and submission.get("publisher_id"):
+        notify_users(
+            [submission["publisher_id"]],
+            title="Your content was removed",
+            body=f"\"{submission['title']}\" was removed by an administrator. Reason: {reason}",
+            type="system",  # moderation notices are never switched off
+            related_id=submission.get("content_id"),
+        )
+    return updated
 
 
 def remove_own_content(publisher_id: str, type: str, content_id: str) -> None:
     """A publisher taking down their own live content — distinct from an
     admin's terms-of-service removal, which goes through admin.py instead."""
-    matches = submissions_repo.list(
-        content_id=content_id, publisher_id=publisher_id, type=type, status="published"
-    )
+    matches = [
+        m
+        for status_ in ("published", "scheduled")
+        for m in submissions_repo.list(
+            content_id=content_id, publisher_id=publisher_id, type=type, status=status_
+        )
+    ]
     if not matches:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only remove your own listings.")
     remove_content(matches[0], "Removed by the publisher.")

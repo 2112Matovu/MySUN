@@ -250,6 +250,19 @@ def seed_content(admin, publisher_name: str) -> None:
     admin.table("transport_providers").insert(transport).execute()
     print(f"seeded {len(transport)} transport providers")
 
+    campus_services = [
+        {"category": "food", "name": "University Canteen", "location": "Main Campus",
+         "description": "Meals and snacks for students and staff."},
+        {"category": "health", "name": "University Health Unit", "location": "Main Campus",
+         "description": "First aid and basic consultations for students."},
+        {"category": "it_support", "name": "ICT Help Desk", "location": "ICT Directorate",
+         "description": "Wi-Fi, student portal and account password help."},
+        {"category": "library", "name": "University Library", "location": "Main Campus",
+         "description": "Books, journals, study spaces and printing."},
+    ]
+    admin.table("campus_services").insert(campus_services).execute()
+    print(f"seeded {len(campus_services)} campus services")
+
     bus_schedules = [
         {
             "route_name": "Morning Express",

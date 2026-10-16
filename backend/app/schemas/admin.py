@@ -26,3 +26,7 @@ class AdminAnalytics(BaseModel):
     api_online: bool = True
     database_health_percent: float = 100
     storage_used_percent: float = 0
+
+
+class VerifyRequest(BaseModel):
+    is_verified: bool

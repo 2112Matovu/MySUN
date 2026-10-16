@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5000"
     log_level: str = "INFO"
     sentry_dsn: str | None = None
+    # Firebase service-account key (the JSON itself, or a path to it) for
+    # push notifications. Unset = in-app notifications only.
+    fcm_service_account_json: str | None = None
+    # Runs the event-reminder job inside the API process every few minutes.
+    # Turn off if an external scheduler hits /internal/run-reminders instead.
+    reminders_enabled: bool = True
+    # Shared secret for POST /internal/run-reminders (unset = endpoint off).
+    cron_secret: str | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:

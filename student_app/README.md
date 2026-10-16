@@ -1,10 +1,13 @@
 # MySun — Student App
 
 Flutter mobile client for the MySun campus companion (Soroti University).
-Currently runs entirely on **mock data** — no backend required. The data layer
-is shaped to match the REST contract in
-`../MySun_Complete_Software_Specification.md` so wiring in the FastAPI backend is
-a drop-in swap at `lib/providers/repositories.dart`.
+Talks to the FastAPI backend by default (`Http*Repository` in
+`lib/providers/repositories.dart`; the `Mock*Repository` classes remain for
+offline development). Set the API with
+`--dart-define=API_BASE_URL=https://<host>/api/v1`. Push notifications use
+Firebase Cloud Messaging: place `google-services.json` (git-ignored) in
+`android/app/`; the `com.google.gms.google-services` Gradle plugin and
+`lib/core/push/push_service.dart` do the rest.
 
 ## Stack
 
@@ -14,7 +17,8 @@ a drop-in swap at `lib/providers/repositories.dart`.
 | Navigation | go_router (`StatefulShellRoute` for the bottom nav) |
 | Theming | Material 3, single seed colour, light + dark |
 | Local storage | `shared_preferences` (settings, bookmarks); Hive initialised for future offline cache |
-| Networking | `dio` (added, unused until the backend is live) |
+| Networking | `dio` (live backend, token refresh) |
+| Push | `firebase_core` + `firebase_messaging` (FCM) |
 | Images | `cached_network_image` with a graceful category-tinted fallback |
 
 ## First run

@@ -43,8 +43,8 @@ class _Query:
         self._insert = data
         return self
 
-    def upsert(self, data):
-        self._insert = data
+    def upsert(self, data, on_conflict=None, ignore_duplicates=False):
+        self._insert, self._conflict = data, on_conflict.split(",") if on_conflict else None
         return self
 
     def delete(self):
@@ -94,6 +94,9 @@ class _Query:
         if self._insert is not None:
             made = []
             for item in self._insert if isinstance(self._insert, list) else [self._insert]:
+                key = getattr(self, "_conflict", None)
+                if key and any(all(r.get(k) == item.get(k) for k in key) for r in rows):
+                    continue
                 row = {"id": f"id{next(self.db.ids)}", "status": "pending",
                        "created_at": datetime.now(timezone.utc).isoformat(),
                        "published_at": datetime.now(timezone.utc).isoformat(), **item}

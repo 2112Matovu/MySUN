@@ -8,7 +8,8 @@ Storage. Mirrors the Flutter app's mock repositories field-for-field — see
 ## Setup
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL Editor, run `supabase/migrations/0001_init.sql` (or install
+2. In the SQL Editor, run every file in `supabase/migrations/` in order
+   (`0001_init.sql` through `0005_scheduled_posting.sql`), or install
    the [Supabase CLI](https://supabase.com/docs/guides/cli) and run
    `supabase db push` from this folder).
 3. Copy `.env.example` to `.env` and fill in three values from
@@ -103,10 +104,11 @@ problem.
   signing keys, so there's nothing extra to configure. New accounts always
   start as `student`; only a Super Admin can promote via
   `PATCH /api/v1/admin/users/{id}/role`.
-- **Supabase Storage** — not yet wired into any endpoint (the Flutter app's
-  image fields currently take a public URL directly, matching its mock
-  `picsum.photos` seed data). Add a bucket and an upload endpoint when real
-  photo uploads are needed.
+- **Supabase Storage** — `POST /api/v1/uploads` stores publisher photos in
+  a bucket and returns the public URL; every publishing form in the app
+  uses it.
+- **Firebase Cloud Messaging** — `app/services/fcm.py` sends HTTP v1 pushes
+  using a service-account key (see Push notifications below).
 
 ## Google Sign-In setup
 
@@ -140,11 +142,51 @@ Google Cloud project, tied to the app's package name
 fingerprint (`cd student_app/android && ./gradlew signingReport`). Web
 doesn't need this — only the Web client ID above.
 
+## Push notifications, scheduling and reminders
+
+- **Push**: `app/services/notify.py` writes in-app notifications (respecting
+  each user's category preferences) and then pushes to their registered
+  devices through `app/services/fcm.py`. Devices register via
+  `POST /api/v1/notifications/devices` and unregister via
+  `/devices/unregister`; preferences via `GET/PUT /notifications/preferences`.
+  Set `FCM_SERVICE_ACCOUNT_JSON` (the key JSON itself, or a file path such
+  as `fcm-service-account.json`). Unset means no push; in-app notifications
+  still work. A device token is deleted only when FCM reports it
+  unregistered or invalid, not for payload errors.
+- **Scheduled posting**: announcements and events take an optional
+  `publish_at` (between a minute and a year ahead). Until then they are
+  hidden from public lists; `PATCH /events/{id}/schedule` and the matching
+  announcement route move or release them early.
+  `app/services/scheduling.py` sends the new-content alert once the time
+  arrives; a failed release is retried on the next run.
+- **Event reminders**: about a day and an hour before start, to registered
+  and bookmarked users (`app/services/reminders.py`). Each (event, user,
+  kind) is claimed with an insert-or-ignore on `event_reminders_sent`, so
+  overlapping runs never double-send. The release and reminder jobs run
+  in-process every 5 minutes (`REMINDERS_ENABLED=true`), or from an
+  external scheduler via `POST /api/v1/internal/run-reminders` with
+  `CRON_SECRET`.
+- **Other endpoints added**: `/search`, `/bookings` (create, mine, incoming,
+  cancel, respond), `/transport/{id}/rate`, `/campus-services`, event
+  registration.
+
+## Known issues (from the latest code review, not yet fixed)
+
+- `PATCH /events/{id}/schedule` compares an aware stored date with the raw
+  request date before normalising, so a naive timestamp gives a 500.
+- Chained `.or_()` filters in `announcements.py` rely on postgrest-py
+  ANDing repeated `or` params (unverified).
+- `notify.py` sends pushes one blocking request at a time; a large publish
+  can occupy a worker. `all_user_ids` paginates without an `.order()`.
+- Admin analytics count scheduled (not yet live) items.
+- A rider's owner can book their own listing; scheduled items 404 on the
+  detail endpoint even for their publisher.
+
 ## Key behavior notes
 
-- **Publishing is immediate.** There is no pre-approval gate — creating an
-  announcement/event/accommodation listing/boda rider makes it live right
-  away. Admins (`admin`, `minor_admin`) can only **remove** content that
+- **Publishing is immediate unless scheduled.** There is no pre-approval
+  gate — creating an announcement/event/accommodation listing/boda rider
+  makes it live right away, or at its `publish_at` time if one is set. Admins (`admin`, `minor_admin`) can only **remove** content that
   breaks the terms of service (`POST /api/v1/admin/moderation/{id}/remove`);
   there is no separate "approve" step.
 - **Publishers can remove their own content** via the content type's own

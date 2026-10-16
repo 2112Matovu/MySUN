@@ -4,6 +4,7 @@ stop filtering them out - but this module sends the new-content alert once
 the time arrives and moves the publisher's submission from scheduled to
 published."""
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
@@ -13,6 +14,8 @@ from app.schemas.user import UserProfile
 from app.services.announce import ANNOUNCERS
 from app.services.content_filters import is_live, validate_publish_at
 from app.services.table_repo import TableRepo
+
+logger = logging.getLogger("mysun")
 
 TABLE_BY_TYPE = {"announcement": "announcements", "event": "events"}
 
@@ -48,21 +51,32 @@ def release_due_content(now: datetime | None = None) -> int:
             )
             if not claimed:
                 continue
-            subs = (
-                db.table("publisher_submissions")
-                .select("id,publisher_id")
-                .eq("type", type_)
-                .eq("content_id", row["id"])
-                .eq("status", "scheduled")
-                .execute()
-                .data
-            )
-            for sub in subs:
-                db.table("publisher_submissions").update(
-                    {"status": "published", "updated_at": _iso(now)}
-                ).eq("id", sub["id"]).execute()
-            ANNOUNCERS[type_](row, subs[0]["publisher_id"] if subs else None)
+            try:
+                subs = (
+                    db.table("publisher_submissions")
+                    .select("id,publisher_id")
+                    .eq("type", type_)
+                    .eq("content_id", row["id"])
+                    .eq("status", "scheduled")
+                    .execute()
+                    .data
+                )
+                ANNOUNCERS[type_](row, subs[0]["publisher_id"] if subs else None)
+            except Exception:
+                # Give the claim back so the next run retries this item, and
+                # keep going: one bad row must not block the others.
+                logger.exception("Releasing scheduled %s %s failed", type_, row["id"])
+                db.table(table).update({"notified_at": None}).eq("id", row["id"]).execute()
+                continue
             released += 1
+            try:
+                for sub in subs:
+                    db.table("publisher_submissions").update(
+                        {"status": "published", "updated_at": _iso(now)}
+                    ).eq("id", sub["id"]).execute()
+            except Exception:
+                # The alert already went out; retrying would send it twice.
+                logger.exception("Marking submissions published failed for %s", row["id"])
     return released
 
 

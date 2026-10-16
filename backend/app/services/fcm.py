@@ -41,6 +41,17 @@ def is_configured() -> bool:
         return False
 
 
+def _token_is_dead(res: requests.Response) -> bool:
+    """True only when FCM says the device token itself is bad. A 400
+    INVALID_ARGUMENT can also mean a bad payload, which must not cost the
+    user their token."""
+    if res.status_code not in (400, 404):
+        return False
+    if "UNREGISTERED" in res.text:
+        return True
+    return "INVALID_ARGUMENT" in res.text and "message.token" in res.text
+
+
 def send(token: str, title: str, body: str, data: dict[str, str] | None = None) -> SendResult:
     """Sends one push. "invalid" means the token is dead and should be deleted."""
     loaded = _credentials()
@@ -69,9 +80,7 @@ def send(token: str, title: str, body: str, data: dict[str, str] | None = None) 
         return "error"
     if res.ok:
         return "ok"
-    if res.status_code in (400, 404) and any(
-        marker in res.text for marker in ("UNREGISTERED", "INVALID_ARGUMENT")
-    ):
+    if _token_is_dead(res):
         return "invalid"
     logger.error("FCM rejected a message", extra={"status_code": res.status_code})
     return "error"

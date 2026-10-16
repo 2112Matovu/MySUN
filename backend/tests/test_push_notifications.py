@@ -206,3 +206,53 @@ def test_cron_endpoint_checks_the_secret(client, monkeypatch):
     assert client.post("/api/v1/internal/run-reminders", headers={"X-Cron-Secret": "no"}).status_code == 403
     ok = client.post("/api/v1/internal/run-reminders", headers={"X-Cron-Secret": "s3cret"})
     assert ok.status_code == 200 and ok.json() == {"day": 0, "hour": 0, "released": 3}
+
+
+# ── review fixes ─────────────────────────────────────────────────────────
+class _FcmRes:
+    def __init__(self, status_code, text):
+        self.status_code, self.text = status_code, text
+
+
+@pytest.mark.parametrize(
+    "status_code, text, dead",
+    [
+        (404, '{"error":{"status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}', True),
+        (400, '{"error":{"status":"INVALID_ARGUMENT","message":"The registration token is not valid","details":[{"field":"message.token"}]}}', True),
+        (400, '{"error":{"status":"INVALID_ARGUMENT","message":"Android message is too big"}}', False),
+        (500, "UNREGISTERED", False),
+    ],
+)
+def test_only_token_problems_mark_a_token_dead(status_code, text, dead):
+    assert notify_module.fcm._token_is_dead(_FcmRes(status_code, text)) is dead
+
+
+def test_reminder_claim_blocks_a_second_runner(db):
+    _event(db, "e1", 5)
+    db.tables["event_registrations"] = [{"event_id": "e1", "user_id": "u1"}]
+    db.tables["event_reminders_sent"] = [{"event_id": "e1", "user_id": "u1", "kind": "day"}]
+    assert reminders_module.run_event_reminders(NOW) == {"day": 0, "hour": 0}
+    assert db.tables.get("notifications", []) == []
+
+
+def test_failed_release_gives_the_claim_back_and_continues(db, monkeypatch):
+    from app.services import scheduling
+
+    monkeypatch.setattr(scheduling, "get_supabase_admin", lambda: db)
+    past = (NOW - timedelta(minutes=1)).isoformat()
+    db.tables["announcements"] = [
+        {"id": "a1", "publish_at": past, "notified_at": None},
+        {"id": "a2", "publish_at": past, "notified_at": None},
+    ]
+    calls = []
+
+    def announcer(row, publisher_id):
+        calls.append(row["id"])
+        if row["id"] == "a1":
+            raise RuntimeError("boom")
+
+    monkeypatch.setitem(scheduling.ANNOUNCERS, "announcement", announcer)
+    assert scheduling.release_due_content(NOW) == 1
+    assert calls == ["a1", "a2"]
+    rows = {r["id"]: r for r in db.tables["announcements"]}
+    assert rows["a1"]["notified_at"] is None and rows["a2"]["notified_at"] is not None

@@ -6,6 +6,16 @@
 **Prepared for:** Soroti University  
 **Status:** Complete Specification - Ready for Frontend Development
 
+> **Build status (October 2026):** the app and backend are built and wired
+> together. Beyond the original plan, the build now includes real photo
+> uploads (Supabase Storage), event registration, ratings and boda
+> bookings, campus services, search, scheduled posting, event reminders,
+> and push notifications via Firebase Cloud Messaging (project
+> `mysun-5cede`). Next: on-device push test, permanent Render deployment,
+> iOS. See `README.md` and `backend/README.md` for current setup and known
+> issues; where this spec differs, the inline "as actually built" notes and
+> those READMEs win.
+
 ---
 
 ## TABLE OF CONTENTS

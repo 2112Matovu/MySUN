@@ -50,16 +50,21 @@ def run_event_reminders(now: datetime | None = None) -> dict[str, int]:
             .data
         )
         audience = {r["user_id"] for r in registered} | {r["user_id"] for r in saved}
-        already = {
-            r["user_id"]
-            for r in db.table("event_reminders_sent")
-            .select("user_id")
-            .eq("event_id", ev["id"])
-            .eq("kind", kind)
+        if not audience:
+            continue
+        # Claim first: the primary key (event, user, kind) lets only one
+        # runner insert each row, so overlapping runs never double-send.
+        claimed = (
+            db.table("event_reminders_sent")
+            .upsert(
+                [{"event_id": ev["id"], "user_id": uid, "kind": kind} for uid in sorted(audience)],
+                on_conflict="event_id,user_id,kind",
+                ignore_duplicates=True,
+            )
             .execute()
             .data
-        }
-        todo = sorted(audience - already)
+        )
+        todo = sorted(r["user_id"] for r in claimed)
         if not todo:
             continue
 
@@ -70,8 +75,5 @@ def run_event_reminders(now: datetime | None = None) -> dict[str, int]:
             type="reminder",
             related_id=ev["id"],
         )
-        db.table("event_reminders_sent").insert(
-            [{"event_id": ev["id"], "user_id": uid, "kind": kind} for uid in todo]
-        ).execute()
         sent[kind] += len(todo)
     return sent

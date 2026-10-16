@@ -202,7 +202,8 @@ MySun System (1 App + Extensible Services)
 - Dependency injection (FastAPI `Depends`, role-gate dependencies)
 - Pydantic validation
 - Comprehensive error handling
-- Rate limiting & logging (still planned, not yet implemented)
+- Rate limiting (slowapi, on `/auth/*`) & JSON logging with request-ID
+  correlation
 
 **Data Layer:**
 - **Supabase PostgreSQL** (managed, was self-hosted)
@@ -215,10 +216,12 @@ MySun System (1 App + Extensible Services)
 **Deployment:**
 - Database/Auth/Storage: Supabase-managed (no self-hosted Postgres, no
   backup scripts to run — Supabase handles this)
-- Backend API: still self-hostable (Docker) or deployable to any Python
-  host; no longer needs to run its own Postgres instance
-- Nginx reverse proxy (unchanged, in front of the FastAPI app)
-- SSL/TLS encryption
+- Backend API: deploys to **Render** (free tier, Blueprint from
+  `backend/render.yaml` + `backend/Dockerfile`) — Render terminates
+  TLS itself, so no self-hosted Nginx/cert setup needed there; also
+  still self-hostable (Docker + Nginx) on any VM for that path
+- SSL/TLS encryption (Render-managed on Render; certbot/managed LB if
+  self-hosting)
 
 ---
 
@@ -241,8 +244,9 @@ MySun System (1 App + Extensible Services)
 | **State Management** | Riverpod 2.x | Reactive, testable, DI |
 | **Navigation** | go_router **14.x** (was 10.x) | Declarative, deep linking |
 | **Real-time** | WebSocket | Live updates — still Phase 2, not built |
-| **Reverse Proxy** | Nginx | Fast, reliable |
+| **Reverse Proxy** | Nginx | Fast, reliable (self-hosted path only — Render is its own reverse proxy/TLS) |
 | **Containerization** | Docker | Deployment consistency (backend only now — no self-hosted DB container needed) |
+| **Hosting** | Render (free tier) | `backend/render.yaml` Blueprint + port-agnostic Dockerfile; cold start after ~15 min idle on free tier |
 
 **Python Dependencies** (`backend/requirements.txt`, unpinned `>=` —
 this machine runs Python 3.14, too new for some packages' pinned-version

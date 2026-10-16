@@ -12,7 +12,7 @@ plan).
 | Folder | Component | Stack | Status |
 |---|---|---|---|
 | `student_app/` | Student/staff mobile app — **includes Admin management**, not a separate app | Flutter + Riverpod + go_router | Functional end-to-end on mock data (auth, publishing, drafts, admin moderation) |
-| `backend/` | REST API | Python 3.11 + FastAPI + **Supabase** (Postgres + Auth + Storage) | Scaffolded and verified to boot; not yet wired to a real Supabase project or to the Flutter app |
+| `backend/` | REST API | Python 3.11 + FastAPI + **Supabase** (Postgres + Auth + Storage), served by `uvicorn`, containerized with Docker | Live end-to-end against a real Supabase project and wired into the Flutter app; deployable to **Render** (free tier) via `backend/render.yaml` |
 
 There is no separate `admin_portal/` — Super Admin and Minor Admin are an
 extra tab inside `student_app/`, gated by role exactly like the Publisher
@@ -21,13 +21,16 @@ tab (see the spec's §2.1).
 ## Build order
 
 1. ~~Student app on mock data~~ — done, UX proven end to end.
-2. **Backend** (current) — FastAPI + Supabase, schema in
-   `backend/supabase/migrations/`, endpoints in spec §9.
-3. **Next:** create the Supabase project, then wire the student app's
-   `Mock*Repository` classes to real HTTP calls against the backend
-   (the repository interfaces were kept API-shaped from the start for
-   exactly this swap).
-4. iOS build, once Mac/Xcode access exists.
+2. ~~Backend~~ — FastAPI + Supabase, schema in
+   `backend/supabase/migrations/`, endpoints in spec §9. Live and wired
+   to the app.
+3. ~~Wire the student app's `Mock*Repository` classes to real HTTP
+   calls~~ — done; `Http*Repository` implementations are the default.
+4. **Current:** production hardening (Docker, logging, rate limits,
+   secure token storage, release signing) and getting the backend
+   deployed somewhere permanent (Render free tier — scaffolded in
+   `backend/render.yaml`, not yet actually deployed).
+5. iOS build, once Mac/Xcode access exists.
 
 ## Student app — quick start
 

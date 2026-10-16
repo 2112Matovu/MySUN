@@ -49,3 +49,24 @@ class AuthResponse(BaseModel):
     access_token: str
     refresh_token: str | None = None
     user: UserProfile
+    # Set when an admin-level account has two-factor on: the token is only a
+    # first-factor session and the app must POST /auth/mfa/verify next.
+    mfa_required: bool = False
+    mfa_factor_id: str | None = None
+
+
+class MfaVerifyRequest(BaseModel):
+    factor_id: str
+    code: str
+
+
+class MfaStatus(BaseModel):
+    enrolled: bool
+    verified_this_session: bool
+    required: bool
+
+
+class MfaEnrollment(BaseModel):
+    factor_id: str
+    secret: str | None = None
+    uri: str | None = None

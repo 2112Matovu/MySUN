@@ -15,9 +15,9 @@ def test_login_is_rate_limited(client, fake_supabase_always_rejects):
     to blunt brute-force/credential-stuffing."""
     statuses = [
         client.post(
-            "/api/v1/auth/login", json={"email": "x@sun.ac.ug", "password": "wrong"}
+            "/api/v1/auth/login", json={"email": f"x{i}@sun.ac.ug", "password": "wrong"}
         ).status_code
-        for _ in range(10)
+        for i in range(10)
     ]
     assert statuses[:8] == [401] * 8
     assert statuses[8] == 429

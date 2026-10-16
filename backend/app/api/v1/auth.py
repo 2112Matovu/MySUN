@@ -1,25 +1,50 @@
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.core.limiter import limiter
-from app.core.security import get_current_user
+from app.core.config import get_settings
+from app.core.security import get_current_user, get_token
 from app.core.supabase_client import get_supabase_admin, get_supabase_anon
 from app.schemas.user import (
     AuthResponse,
     GoogleLoginRequest,
     LoginRequest,
+    MfaEnrollment,
+    MfaStatus,
+    MfaVerifyRequest,
     PasswordResetRequest,
     RefreshRequest,
     SignUpRequest,
     UserProfile,
 )
 
-from app.services import audit
+from app.services import audit, mfa
 
 logger = logging.getLogger("mysun")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+# Per-email lockout on repeated wrong passwords (NFR-SEC-10). In-process, so
+# with several workers each counts separately; the per-IP limiter and
+# Supabase's own limits still apply on top.
+_MAX_FAILS = 5
+_FAIL_WINDOW = 15 * 60
+_failures: dict[str, list[float]] = {}
+
+
+def _check_lockout(email: str) -> None:
+    now = time.monotonic()
+    recent = [t for t in _failures.get(email, []) if now - t < _FAIL_WINDOW]
+    _failures[email] = recent
+    if len(recent) >= _MAX_FAILS:
+        wait = int((_FAIL_WINDOW - (now - recent[0])) // 60) + 1
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Too many failed attempts. Try again in about {wait} minute{'s' if wait != 1 else ''}.",
+        )
 
 
 def _load_profile(user_id: str) -> UserProfile:
@@ -61,18 +86,33 @@ def signup(request: Request, body: SignUpRequest) -> AuthResponse:
 @router.post("/login", response_model=AuthResponse)
 @limiter.limit("8/minute")
 def login(request: Request, body: LoginRequest) -> AuthResponse:
+    email = body.email.lower()
+    _check_lockout(email)
     try:
         result = get_supabase_anon().auth.sign_in_with_password(
             {"email": body.email, "password": body.password}
         )
     except Exception as exc:  # supabase-py raises AuthApiError on bad credentials
+        _failures.setdefault(email, []).append(time.monotonic())
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password.") from exc
+    _failures.pop(email, None)
 
-    return AuthResponse(
+    user = _load_profile(result.user.id)
+    response = AuthResponse(
         access_token=result.session.access_token,
         refresh_token=result.session.refresh_token,
-        user=_load_profile(result.user.id),
+        user=user,
     )
+    if user.role in ("admin", "minor_admin"):
+        try:
+            factor = mfa.verified_totp_factor(result.session.access_token)
+        except mfa.MfaError:
+            logger.exception("Could not check two-factor status at login")
+            factor = None
+        if factor:
+            response.mfa_required = True
+            response.mfa_factor_id = factor
+    return response
 
 
 @router.post("/google", response_model=AuthResponse)
@@ -175,3 +215,59 @@ def delete_my_account(user: UserProfile = Depends(get_current_user)) -> None:
         )
     audit.record(user, "account_deleted", "user", user.id, {"email": user.email})
     get_supabase_admin().auth.admin.delete_user(user.id)
+
+
+def _mfa_error(exc: mfa.MfaError) -> HTTPException:
+    return HTTPException(exc.status_code, exc.message)
+
+
+@router.get("/mfa/status", response_model=MfaStatus)
+def mfa_status(
+    user: UserProfile = Depends(get_current_user), token: str = Depends(get_token)
+) -> MfaStatus:
+    try:
+        enrolled = mfa.verified_totp_factor(token) is not None
+    except mfa.MfaError as exc:
+        raise _mfa_error(exc) from exc
+    return MfaStatus(
+        enrolled=enrolled,
+        verified_this_session=mfa.token_aal(token) == "aal2",
+        required=get_settings().admin_require_2fa and user.role in ("admin", "minor_admin"),
+    )
+
+
+@router.post("/mfa/enroll", response_model=MfaEnrollment)
+def mfa_enroll(
+    user: UserProfile = Depends(get_current_user), token: str = Depends(get_token)
+) -> MfaEnrollment:
+    """Starts TOTP enrolment for an admin-level account. Scan or type the
+    returned secret into an authenticator app, then confirm with
+    POST /auth/mfa/verify."""
+    if user.role not in ("admin", "minor_admin"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Two-factor is for admin accounts")
+    try:
+        return MfaEnrollment(**mfa.enroll(token))
+    except mfa.MfaError as exc:
+        raise _mfa_error(exc) from exc
+
+
+@router.post("/mfa/verify", response_model=AuthResponse)
+@limiter.limit("10/minute")
+def mfa_verify(
+    request: Request,
+    body: MfaVerifyRequest,
+    user: UserProfile = Depends(get_current_user),
+    token: str = Depends(get_token),
+) -> AuthResponse:
+    """Checks a 6-digit code. Used both to finish enrolment and as the second
+    step of sign-in; returns the upgraded (aal2) session."""
+    try:
+        session = mfa.verify(token, body.factor_id, body.code.strip())
+    except mfa.MfaError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "That code didn't work. Try the newest one.") from exc
+    audit.record(user, "mfa_verified", "user", user.id)
+    return AuthResponse(
+        access_token=session["access_token"],
+        refresh_token=session.get("refresh_token"),
+        user=user,
+    )

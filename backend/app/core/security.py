@@ -1,7 +1,9 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.config import get_settings
 from app.core.supabase_client import get_supabase_admin
+from app.services.mfa import token_aal
 from app.schemas.user import UserProfile
 from app.services.usage import touch_last_seen
 
@@ -53,13 +55,30 @@ async def get_optional_user(
         return None
 
 
+async def get_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> str:
+    if credentials is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
+    return credentials.credentials
+
+
 def require_role(*roles: str):
     """§4.5 / §7.1-style role gate — same shape as the Flutter router's
     redirect guards (student_app/lib/core/router/app_router.dart)."""
 
-    async def _dependency(user: UserProfile = Depends(get_current_user)) -> UserProfile:
+    async def _dependency(
+        user: UserProfile = Depends(get_current_user),
+        credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    ) -> UserProfile:
         if user.role not in roles:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed for this role")
+        if (
+            get_settings().admin_require_2fa
+            and user.role in ("admin", "minor_admin")
+            and (credentials is None or token_aal(credentials.credentials) != "aal2")
+        ):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Two-factor authentication required")
         return user
 
     return _dependency

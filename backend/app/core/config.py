@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Shared secret for POST /internal/run-reminders (unset = endpoint off).
     cron_secret: str | None = None
 
+    # When true, admin-level accounts must pass TOTP two-factor sign-in
+    # (Supabase MFA) before any admin endpoint accepts them. Roll out by first
+    # letting every admin enrol (Profile > Two-factor authentication).
+    admin_require_2fa: bool = False
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

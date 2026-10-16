@@ -144,3 +144,94 @@ def test_owner_cannot_book_their_own_rider(client, as_role, db):
     as_role("publisher", "pub")
     res = client.post("/api/v1/bookings", json={"provider_id": "r1", "pickup": "Main Gate", "destination": "Town"})
     assert res.status_code == 400
+
+
+# ── lockout and two-factor ───────────────────────────────────────────────
+from app.api.v1 import auth as _auth
+from app.services import mfa as mfa_module
+
+
+@pytest.fixture
+def failing_login(monkeypatch):
+    _auth._failures.clear()
+
+    class _Anon:
+        class auth:
+            @staticmethod
+            def sign_in_with_password(_):
+                raise RuntimeError("bad password")
+
+    monkeypatch.setattr(_auth, "get_supabase_anon", lambda: _Anon)
+    yield
+    _auth._failures.clear()
+
+
+def test_five_wrong_passwords_lock_the_account_for_a_while(client, failing_login):
+    body = {"email": "a@x.ug", "password": "wrong"}
+    for _ in range(5):
+        assert client.post("/api/v1/auth/login", json=body).status_code == 401
+    res = client.post("/api/v1/auth/login", json=body)
+    assert res.status_code == 429 and "Try again" in res.json()["detail"]
+    # another address is unaffected
+    assert client.post("/api/v1/auth/login", json={**body, "email": "b@x.ug"}).status_code == 401
+
+
+def _jwt(claims):
+    import base64, json
+    enc = lambda d: base64.urlsafe_b64encode(json.dumps(d).encode()).decode().rstrip("=")
+    return f"{enc({'alg': 'none'})}.{enc(claims)}.sig"
+
+
+def test_token_aal_reads_the_claim():
+    assert mfa_module.token_aal(_jwt({"aal": "aal2"})) == "aal2"
+    assert mfa_module.token_aal(_jwt({})) == "aal1"
+    assert mfa_module.token_aal("garbage") == "aal1"
+
+
+def test_admin_endpoints_demand_aal2_when_2fa_is_required(client, monkeypatch):
+    from app.core import security
+    from app.core.security import get_current_user
+
+    admin = UserProfile(id="ad", name="A", email="a@x.ug", role="admin")
+    app.dependency_overrides[get_current_user] = lambda: admin
+    monkeypatch.setattr(security, "get_settings", lambda: type("S", (), {"admin_require_2fa": True})())
+    low = {"Authorization": f"Bearer {_jwt({'aal': 'aal1'})}"}
+    high = {"Authorization": f"Bearer {_jwt({'aal': 'aal2'})}"}
+    assert client.get("/api/v1/admin/audit", headers=low).status_code == 403
+    assert client.get("/api/v1/admin/audit", headers=low).json()["detail"].startswith("Two-factor")
+    # passes the gate with aal2 (then fails on the unmocked database, which is not a 403)
+    assert client.get("/api/v1/admin/audit", headers=high).status_code != 403
+
+
+def test_mfa_verify_returns_the_upgraded_session(client, as_role, monkeypatch, db):
+    as_role("admin", "boss")
+    monkeypatch.setattr(
+        mfa_module, "verify",
+        lambda token, fid, code: {"access_token": "aal2-token", "refresh_token": "r2"},
+    )
+    res = client.post(
+        "/api/v1/auth/mfa/verify",
+        json={"factor_id": "f1", "code": " 123456 "},
+        headers={"Authorization": "Bearer aal1-token"},
+    )
+    assert res.status_code == 200 and res.json()["access_token"] == "aal2-token"
+
+
+def test_mfa_verify_wrong_code_is_401(client, as_role, monkeypatch, db):
+    as_role("admin", "boss")
+
+    def boom(*a):
+        raise mfa_module.MfaError("invalid", 400)
+
+    monkeypatch.setattr(mfa_module, "verify", boom)
+    res = client.post(
+        "/api/v1/auth/mfa/verify",
+        json={"factor_id": "f1", "code": "000000"},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert res.status_code == 401
+
+
+def test_students_cannot_enrol_in_2fa(client, as_role, db):
+    as_role("student", "u1")
+    assert client.post("/api/v1/auth/mfa/enroll", headers={"Authorization": "Bearer t"}).status_code == 403

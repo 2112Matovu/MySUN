@@ -31,12 +31,16 @@ tab (see the spec's §2.1).
 5. ~~Feature round~~ — event registration, ratings and boda bookings,
    campus services, search, scheduled posting, event reminders, and push
    notifications via Firebase Cloud Messaging.
-6. **Current:** testing push on a real device through a tunnel, then
+6. ~~SRS gap closure~~ — audit log, CSV export, real analytics and
+   publisher stats, password reset, account export/delete, retention purge,
+   login lockout, admin session timeout, optional TOTP two-factor, offline
+   feed cache, calendar export. Code-review findings are fixed.
+7. **Current:** testing push on a real device through a tunnel, then
    deploying the backend permanently (Render free tier — scaffolded in
-   `backend/render.yaml`, not yet deployed; set
-   `FCM_SERVICE_ACCOUNT_JSON` there too). Open code-review items: see
-   "Known issues" in `backend/README.md`.
-7. iOS build, once Mac/Xcode access exists.
+   `backend/render.yaml`, not yet deployed; set `FCM_SERVICE_ACCOUNT_JSON`
+   there too). Operations tasks (backups, monitoring, enrolling admins in
+   2FA) are in [`docs/OPERATIONS.md`](./docs/OPERATIONS.md).
+8. iOS build, once Mac/Xcode access exists.
 
 ## Push notifications (Firebase) — setup summary
 

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mysun_app/core/network/api_client.dart';
+import 'package:mysun_app/core/network/json_cache.dart';
 import 'package:mysun_app/core/network/token_storage.dart';
 import 'package:mysun_app/data/repositories/accommodation_repository.dart';
 import 'package:mysun_app/data/repositories/admin_repository.dart';
@@ -13,6 +14,7 @@ import 'package:mysun_app/data/repositories/notification_repository.dart';
 import 'package:mysun_app/data/repositories/publisher_repository.dart';
 import 'package:mysun_app/data/repositories/search_repository.dart';
 import 'package:mysun_app/data/repositories/transport_repository.dart';
+import 'package:mysun_app/providers/settings_provider.dart';
 
 /// Repository wiring — talks to the real FastAPI backend (`backend/`, see
 /// `AppConstants.apiBaseUrl`). Swap any of these back to the matching
@@ -22,11 +24,17 @@ final authRepositoryProvider = Provider<AuthRepository>(
 );
 
 final announcementRepositoryProvider = Provider<AnnouncementRepository>(
-  (ref) => HttpAnnouncementRepository(ref.watch(dioProvider)),
+  (ref) => HttpAnnouncementRepository(
+    ref.watch(dioProvider),
+    JsonCache(ref.watch(sharedPreferencesProvider)),
+  ),
 );
 
 final eventRepositoryProvider = Provider<EventRepository>(
-  (ref) => HttpEventRepository(ref.watch(dioProvider)),
+  (ref) => HttpEventRepository(
+    ref.watch(dioProvider),
+    JsonCache(ref.watch(sharedPreferencesProvider)),
+  ),
 );
 
 final accommodationRepositoryProvider = Provider<AccommodationRepository>(

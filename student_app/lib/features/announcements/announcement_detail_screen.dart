@@ -27,6 +27,7 @@ class AnnouncementDetailScreen extends ConsumerWidget {
               final saved =
                   ref.watch(bookmarksProvider).contains(a.bookmarkKey);
               return IconButton(
+                tooltip: 'Bookmark',
                 icon: Icon(
                     saved ? Icons.bookmark : Icons.bookmark_border_outlined),
                 onPressed: () => ref
@@ -37,6 +38,7 @@ class AnnouncementDetailScreen extends ConsumerWidget {
             orElse: () => const SizedBox.shrink(),
           ),
           IconButton(
+            tooltip: 'Share',
             icon: const Icon(Icons.share_outlined),
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Sharing isn't available yet.")),

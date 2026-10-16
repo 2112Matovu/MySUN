@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mysun_app/core/constants/app_constants.dart';
@@ -118,7 +119,7 @@ class ProfileScreen extends ConsumerWidget {
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('${AppConstants.appName} for ${AppConstants.university}'),
-            subtitle: Text('Version 1.0.0 • running on sample data'),
+            subtitle: Text('Version 1.0.0'),
           ),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
@@ -144,16 +145,124 @@ class ProfileScreen extends ConsumerWidget {
             title: const Text('Logout'),
             onTap: () => ref.read(authProvider.notifier).logout(),
           ),
+          if (user.role.isAdminLevel)
+            ListTile(
+              leading: const Icon(Icons.security_outlined),
+              title: const Text('Two-factor authentication'),
+              subtitle: const Text('Protect this admin account with an authenticator app'),
+              onTap: () => _enrollMfa(context, ref),
+            ),
+          ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('Download my data'),
+            subtitle: const Text('Copies everything MySun holds about you'),
+            onTap: () => _exportData(context, ref),
+          ),
           ListTile(
             leading: Icon(Icons.delete_outline, color: theme.colorScheme.error),
             title: Text('Delete account',
                 style: TextStyle(color: theme.colorScheme.error)),
-            onTap: () => _soon(context),
+            onTap: () => _confirmDelete(context, ref),
           ),
           const SizedBox(height: 32),
         ],
       ),
     );
+  }
+
+  Future<void> _enrollMfa(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(authProvider.notifier);
+    try {
+      final enrollment = await notifier.enrollMfa();
+      if (!context.mounted) return;
+      final code = TextEditingController();
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Set up two-factor'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('In an authenticator app (Google Authenticator, Authy...), '
+                    'add an account using this key, then enter the 6-digit code it shows.'),
+                const SizedBox(height: 12),
+                SelectableText(enrollment.secret ?? enrollment.uri ?? '',
+                    style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700)),
+                if (enrollment.secret != null)
+                  TextButton.icon(
+                    onPressed: () => Clipboard.setData(ClipboardData(text: enrollment.secret!)),
+                    icon: const Icon(Icons.copy_outlined),
+                    label: const Text('Copy key'),
+                  ),
+                TextField(
+                  controller: code,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(labelText: '6-digit code'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Turn on')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      await notifier.confirmMfa(enrollment.factorId, code.text);
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Two-factor is on. You will be asked for a code each time you sign in.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text("Couldn't set up two-factor: $e")));
+    }
+  }
+
+  Future<void> _exportData(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final json = await ref.read(authProvider.notifier).exportMyData();
+      await Clipboard.setData(ClipboardData(text: json));
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Your data was copied. Paste it into a note or file to keep it.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text("Couldn't export your data: $e")));
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: const Text(
+            'This permanently removes your account, bookmarks, bookings and '
+            'notifications. Content you already published stays live until an '
+            'admin removes it. This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(authProvider.notifier).deleteAccount();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text("Couldn't delete the account: $e")));
+    }
   }
 
   void _soon(BuildContext context) {

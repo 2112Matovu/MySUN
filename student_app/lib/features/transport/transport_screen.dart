@@ -150,6 +150,7 @@ class _BodaSearchFieldState extends ConsumerState<_BodaSearchField> {
           prefixIcon: const Icon(Icons.search),
           suffixIcon: hasQuery
               ? IconButton(
+                  tooltip: 'Clear search',
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     _controller.clear();

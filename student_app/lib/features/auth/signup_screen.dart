@@ -84,6 +84,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       decoration: InputDecoration(
                         labelText: 'Password (8+ chars, mix)',
                         suffixIcon: IconButton(
+                          tooltip: 'Show or hide password',
                           icon: Icon(_obscure
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined),

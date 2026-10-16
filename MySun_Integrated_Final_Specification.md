@@ -12,7 +12,7 @@
 > bookings, campus services, search, scheduled posting, event reminders,
 > and push notifications via Firebase Cloud Messaging (project
 > `mysun-5cede`). Next: on-device push test, permanent Render deployment,
-> iOS. See `README.md` and `backend/README.md` for current setup and known
+> iOS. Also built since: audit log, CSV export, real usage analytics, password reset, account export/delete, login lockout, admin idle timeout, optional admin TOTP two-factor, offline feed cache. See `README.md` and `backend/README.md` for current setup and known
 > issues; where this spec differs, the inline "as actually built" notes and
 > those READMEs win.
 

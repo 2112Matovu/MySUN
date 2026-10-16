@@ -56,6 +56,7 @@ class HomeScreen extends ConsumerWidget {
               ),
               actions: [
                 IconButton(
+                  tooltip: 'Search',
                   icon: const Icon(Icons.search),
                   onPressed: () => context.push('/search'),
                 ),
@@ -63,6 +64,7 @@ class HomeScreen extends ConsumerWidget {
                   builder: (context, ref, _) {
                     final unread = ref.watch(unreadCountProvider);
                     return IconButton(
+                      tooltip: 'Notifications',
                       icon: Badge(
                         isLabelVisible: unread > 0,
                         label: Text('$unread'),

@@ -28,6 +28,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _code.dispose();
     super.dispose();
   }
 
@@ -42,10 +43,69 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _submit();
   }
 
+  final _code = TextEditingController();
+
+  Widget _codePrompt(AuthState auth, ThemeData theme) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Two-factor sign-in'),
+        leading: IconButton(
+          tooltip: 'Back to sign in',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => ref.read(authProvider.notifier).cancelMfa(),
+        ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(Icons.lock_outline, size: 44),
+                const SizedBox(height: 12),
+                Text(
+                  'Open your authenticator app and enter the 6-digit code for MySun.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _code,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: '6-digit code'),
+                  onSubmitted: (_) => _submitCode(),
+                ),
+                if (auth.errorMessage != null)
+                  Text(auth.errorMessage!, style: TextStyle(color: theme.colorScheme.error)),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: auth.isSubmitting ? null : _submitCode,
+                  child: auth.isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Verify'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _submitCode() => ref.read(authProvider.notifier).submitMfaCode(_code.text);
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final theme = Theme.of(context);
+    if (auth.mfaFactorId != null) return _codePrompt(auth, theme);
 
     return Scaffold(
       body: SafeArea(
@@ -89,6 +149,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: InputDecoration(
                         labelText: 'Password',
                         suffixIcon: IconButton(
+                          tooltip: 'Show or hide password',
                           icon: Icon(_obscure
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined),

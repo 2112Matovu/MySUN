@@ -7,8 +7,8 @@ import 'package:mysun_app/data/models/user_role.dart';
 import 'package:mysun_app/providers/admin_provider.dart';
 import 'package:mysun_app/widgets/state_views.dart';
 
-/// §5.3 Minor Admin Management — Super Admin only. Activity figures are
-/// illustrative until the audit-log backend exists (§9.5).
+/// §5.3 Minor Admin Management — Super Admin only. Per-admin activity is in
+/// the Audit log screen.
 class MinorAdminManagementScreen extends ConsumerWidget {
   const MinorAdminManagementScreen({super.key});
 

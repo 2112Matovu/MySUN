@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mysun_app/data/models/user_role.dart';
 import 'package:mysun_app/features/admin/admin_dashboard_screen.dart';
 import 'package:mysun_app/features/admin/analytics_screen.dart';
+import 'package:mysun_app/features/admin/audit_log_screen.dart';
 import 'package:mysun_app/features/admin/grant_role_screen.dart';
 import 'package:mysun_app/features/admin/minor_admin_management_screen.dart';
 import 'package:mysun_app/features/admin/moderation_queue_screen.dart';
@@ -47,6 +48,7 @@ const _publicRoutes = {'/splash', '/login', '/signup', '/forgot-password'};
 const _superAdminOnlyRoutes = {
   '/admin/users',
   '/admin/analytics',
+  '/admin/audit',
   '/admin/minor-admins',
   '/admin/grant-access',
 };
@@ -112,6 +114,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/admin/analytics',
         builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/admin/audit',
+        builder: (context, state) => const AuditLogScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

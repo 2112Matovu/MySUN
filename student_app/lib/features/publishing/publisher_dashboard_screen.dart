@@ -221,6 +221,7 @@ class _SubmissionTile extends ConsumerWidget {
             ),
           (true, _) => const Icon(Icons.chevron_right),
           (_, true) => IconButton(
+              tooltip: 'Remove listing',
               icon: const Icon(Icons.delete_outline),
               onPressed: () => _confirmRemove(context, ref),
             ),

@@ -9,7 +9,7 @@ Storage. Mirrors the Flutter app's mock repositories field-for-field — see
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. In the SQL Editor, run every file in `supabase/migrations/` in order
-   (`0001_init.sql` through `0005_scheduled_posting.sql`), or install
+   (`0001_init.sql` through `0006_audit_usage.sql`), or install
    the [Supabase CLI](https://supabase.com/docs/guides/cli) and run
    `supabase db push` from this folder).
 3. Copy `.env.example` to `.env` and fill in three values from
@@ -170,17 +170,33 @@ doesn't need this — only the Web client ID above.
   cancel, respond), `/transport/{id}/rate`, `/campus-services`, event
   registration.
 
-## Known issues (from the latest code review, not yet fixed)
+## Accounts, admin controls and compliance
 
-- `PATCH /events/{id}/schedule` compares an aware stored date with the raw
-  request date before normalising, so a naive timestamp gives a 500.
-- Chained `.or_()` filters in `announcements.py` rely on postgrest-py
-  ANDing repeated `or` params (unverified).
-- `notify.py` sends pushes one blocking request at a time; a large publish
-  can occupy a worker. `all_user_ids` paginates without an `.order()`.
-- Admin analytics count scheduled (not yet live) items.
-- A rider's owner can book their own listing; scheduled items 404 on the
-  detail endpoint even for their publisher.
+- **Audit log**: administrator actions (role changes, removals, rider
+  verification, user exports, two-factor checks, account deletions) are
+  written to `audit_log`; Super Admins read it at `GET /admin/audit`.
+- **CSV export**: `GET /admin/users/export.csv` (Super Admin, formula-safe,
+  logged).
+- **Real analytics**: `profiles.last_seen_at` (touched at most every 5
+  minutes) gives daily/monthly active users; `content_views` records
+  announcement/event openings and feeds the publisher performance screen
+  (views, and bookmarks + registrations per view as engagement).
+- **Account data**: `GET /auth/me/export` returns everything held about the
+  caller; `DELETE /auth/me` deletes the account (Super Admins must change
+  role first). `POST /internal/purge-inactive` (cron secret) removes student
+  accounts unseen for two years.
+- **Password reset**: `POST /auth/password-reset` always answers 202. Set the
+  Supabase Site URL so the emailed link lands somewhere useful.
+- **Lockout**: five wrong passwords for one email in 15 minutes gives 429
+  (per process), on top of the per-IP limits.
+- **Two-factor (TOTP)** for admin and minor-admin accounts through Supabase
+  MFA: `GET /auth/mfa/status`, `POST /auth/mfa/enroll`, `POST /auth/mfa/verify`.
+  Login returns `mfa_required` plus a factor id when an admin has enrolled.
+  Set `ADMIN_REQUIRE_2FA=true` only after every admin has enrolled; then admin
+  endpoints demand an `aal2` session.
+- Backups, restore testing, uptime monitoring and the job schedule are in
+  [`../docs/OPERATIONS.md`](../docs/OPERATIONS.md); `scripts/backup_db.ps1`
+  takes a dated `pg_dump`.
 
 ## Key behavior notes
 

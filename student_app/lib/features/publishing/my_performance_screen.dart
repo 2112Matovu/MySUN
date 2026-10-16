@@ -20,8 +20,8 @@ const _typeIcons = {
 };
 
 /// §1.4 "Performance metrics and analytics" — a publisher's own activity.
-/// Counts are real (derived from submission history); views/engagement are
-/// illustrative until the backend analytics pipeline exists (§9.6).
+/// Everything is real: counts from submission history, views from the
+/// backend's view tracking, engagement as bookmarks and registrations per view.
 class MyPerformanceScreen extends ConsumerWidget {
   const MyPerformanceScreen({super.key});
 
@@ -80,14 +80,14 @@ class MyPerformanceScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _SectionLabel('ENGAGEMENT (estimated)', theme),
+              _SectionLabel('ENGAGEMENT', theme),
               const SizedBox(height: 8),
               Card(
                 child: Column(
                   children: [
                     ListTile(
                       leading: const Icon(Icons.visibility_outlined),
-                      title: const Text('Estimated views'),
+                      title: const Text('Views'),
                       trailing: Text('${p.estimatedViews}',
                           style: const TextStyle(fontWeight: FontWeight.w700)),
                     ),
@@ -102,7 +102,8 @@ class MyPerformanceScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'View/engagement figures are estimates for now.',
+                'Views count announcement and event openings. Engagement is the '
+                'share of views that ended in a bookmark or registration.',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.outline),
               ),

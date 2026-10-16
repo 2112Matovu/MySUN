@@ -69,7 +69,7 @@ class AdminDashboardScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            _SectionLabel(isSuperAdmin ? 'KEY METRICS (Last 7 days)' : 'MODERATION'),
+            _SectionLabel(isSuperAdmin ? 'KEY METRICS' : 'MODERATION'),
             const SizedBox(height: 8),
             Card(
               child: Column(
@@ -130,6 +130,11 @@ class AdminDashboardScreen extends ConsumerWidget {
                 icon: Icons.bar_chart_outlined,
                 label: 'Analytics',
                 onTap: () => context.push('/admin/analytics'),
+              ),
+              _AdminLink(
+                icon: Icons.history,
+                label: 'Audit log',
+                onTap: () => context.push('/admin/audit'),
               ),
               _AdminLink(
                 icon: Icons.shield_outlined,

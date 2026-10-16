@@ -17,6 +17,7 @@ class AuthState {
     this.user,
     this.isSubmitting = false,
     this.errorMessage,
+    this.mfaFactorId,
   });
 
   final AuthStatus status;
@@ -24,18 +25,24 @@ class AuthState {
   final bool isSubmitting;
   final String? errorMessage;
 
+  /// Set between a correct password and a correct two-factor code.
+  final String? mfaFactorId;
+
   bool get isLoggedIn => status == AuthStatus.loggedIn;
 
   AuthState copyWith({
     bool? isSubmitting,
     String? errorMessage,
     bool clearError = false,
+    String? mfaFactorId,
+    bool clearMfa = false,
   }) =>
       AuthState(
         status: status,
         user: user,
         isSubmitting: isSubmitting ?? this.isSubmitting,
         errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+        mfaFactorId: clearMfa ? null : (mfaFactorId ?? this.mfaFactorId),
       );
 }
 
@@ -70,9 +77,38 @@ class AuthNotifier extends Notifier<AuthState> {
       final user = await _repo.login(email, password);
       await _persist(user);
       state = AuthState(status: AuthStatus.loggedIn, user: user);
+    } on MfaRequired catch (e) {
+      state = state.copyWith(isSubmitting: false, mfaFactorId: e.factorId);
     } on AuthException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
     }
+  }
+
+  /// Second step of a two-factor sign-in.
+  Future<void> submitMfaCode(String code) async {
+    final factor = state.mfaFactorId;
+    if (factor == null) return;
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      final user = await _repo.verifyMfa(factor, code);
+      await _persist(user);
+      state = AuthState(status: AuthStatus.loggedIn, user: user);
+    } on AuthException catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.message);
+    }
+  }
+
+  /// Backs out of the code prompt, discarding the half-finished session.
+  Future<void> cancelMfa() async {
+    await _repo.logout();
+    state = state.copyWith(isSubmitting: false, clearError: true, clearMfa: true);
+  }
+
+  Future<MfaEnrollment> enrollMfa() => _repo.enrollMfa();
+
+  /// Confirms enrolment with the first code; keeps the user signed in.
+  Future<void> confirmMfa(String factorId, String code) async {
+    await _repo.verifyMfa(factorId, code);
   }
 
   Future<void> signUp({
@@ -99,6 +135,14 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> requestPasswordReset(String email) => _repo.requestPasswordReset(email);
+
+  Future<String> exportMyData() => _repo.exportMyData();
+
+  /// Deletes the account on the server, then signs out locally.
+  Future<void> deleteAccount() async {
+    await _repo.deleteAccount();
+    await logout();
+  }
 
   Future<void> loginWithGoogle() async {
     state = state.copyWith(isSubmitting: true, clearError: true);

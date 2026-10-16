@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -20,6 +21,13 @@ class UserManagementScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('User Management'),
+          actions: [
+            IconButton(
+              tooltip: 'Export users as CSV',
+              icon: const Icon(Icons.file_download_outlined),
+              onPressed: () => _exportCsv(context, ref),
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Students'),
@@ -42,6 +50,18 @@ class UserManagementScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+Future<void> _exportCsv(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final csv = await ref.read(adminRepositoryProvider).exportUsersCsv();
+    await Clipboard.setData(ClipboardData(text: csv));
+    messenger.showSnackBar(const SnackBar(
+        content: Text('User list copied as CSV. Paste it into a spreadsheet.')));
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text("Couldn't export users: $e")));
   }
 }
 

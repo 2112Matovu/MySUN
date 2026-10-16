@@ -100,6 +100,7 @@ class DraftsScreen extends ConsumerWidget {
                     subtitle: Text(
                         '${_labelByType[draft.type]} • saved ${DateFmt.relative(draft.updatedAt)}'),
                     trailing: IconButton(
+                      tooltip: 'Discard draft',
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => _discard(context, ref, draft),
                     ),

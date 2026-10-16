@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import 'package:mysun_app/core/constants/app_constants.dart';
 import 'package:mysun_app/core/network/api_exception.dart';
+import 'package:mysun_app/core/network/json_cache.dart';
 import 'package:mysun_app/data/mock/mock_data.dart';
 import 'package:mysun_app/data/models/announcement.dart';
 
@@ -104,23 +105,29 @@ class MockAnnouncementRepository implements AnnouncementRepository {
 }
 
 class HttpAnnouncementRepository implements AnnouncementRepository {
-  HttpAnnouncementRepository(this._dio);
+  HttpAnnouncementRepository(this._dio, [this._cache = const JsonCache(null)]);
   final Dio _dio;
+  final JsonCache _cache;
 
   /// Unfiltered fetch (including expired ones) — [byIds] and [search] use
   /// this directly so a bookmarked or matched announcement doesn't vanish
   /// just because it expired, same as how past events still show up there.
   Future<List<Announcement>> _all(
       {String? category, bool includeExpired = true}) async {
+    final key = 'announcements.${category ?? 'All'}.$includeExpired';
+    List<Announcement> parse(Object? data) => (data as List)
+        .map((e) => Announcement.fromJson(e as Map<String, dynamic>))
+        .toList();
     try {
       final res = await _dio.get('/announcements', queryParameters: {
         if (category != null && category != 'All') 'category': category,
         if (includeExpired) 'include_expired': true,
       });
-      return (res.data as List)
-          .map((e) => Announcement.fromJson(e as Map<String, dynamic>))
-          .toList();
+      await _cache.put(key, res.data);
+      return parse(res.data);
     } on DioException catch (e) {
+      final cached = JsonCache.isOffline(e) ? _cache.get(key) : null;
+      if (cached != null) return parse(cached);
       throw mapDioError(e);
     }
   }

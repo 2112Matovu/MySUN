@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import 'package:mysun_app/core/constants/app_constants.dart';
 import 'package:mysun_app/core/network/api_exception.dart';
+import 'package:mysun_app/core/network/json_cache.dart';
 import 'package:mysun_app/data/mock/mock_data.dart';
 import 'package:mysun_app/data/models/event.dart';
 
@@ -204,8 +205,9 @@ class MockEventRepository implements EventRepository {
 }
 
 class HttpEventRepository implements EventRepository {
-  HttpEventRepository(this._dio);
+  HttpEventRepository(this._dio, [this._cache = const JsonCache(null)]);
   final Dio _dio;
+  final JsonCache _cache;
 
   bool _matchesDate(Event e, EventDateFilter f) {
     final now = DateTime.now();
@@ -228,14 +230,18 @@ class HttpEventRepository implements EventRepository {
   /// filtering happens client-side on the full list, same shape as the
   /// mock repository.
   Future<List<Event>> _all({String? category}) async {
+    final key = 'events.${category ?? 'All'}';
+    List<Event> parse(Object? data) =>
+        (data as List).map((e) => Event.fromJson(e as Map<String, dynamic>)).toList();
     try {
       final res = await _dio.get('/events', queryParameters: {
         if (category != null && category != 'All') 'category': category,
       });
-      return (res.data as List)
-          .map((e) => Event.fromJson(e as Map<String, dynamic>))
-          .toList();
+      await _cache.put(key, res.data);
+      return parse(res.data);
     } on DioException catch (e) {
+      final cached = JsonCache.isOffline(e) ? _cache.get(key) : null;
+      if (cached != null) return parse(cached);
       throw mapDioError(e);
     }
   }

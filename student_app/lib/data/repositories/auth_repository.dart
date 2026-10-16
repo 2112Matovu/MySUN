@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import 'package:mysun_app/core/constants/app_constants.dart';
@@ -16,6 +18,22 @@ class AuthException implements Exception {
   String toString() => message;
 }
 
+/// Thrown by [AuthRepository.login] when the account has two-factor turned
+/// on: the password was right, but a 6-digit code is still needed.
+class MfaRequired implements Exception {
+  const MfaRequired(this.factorId);
+  final String factorId;
+}
+
+/// What an authenticator app needs to add MySun: the secret to type in, or the
+/// otpauth URI to open/scan, plus the factor id to confirm with.
+class MfaEnrollment {
+  const MfaEnrollment({required this.factorId, this.secret, this.uri});
+  final String factorId;
+  final String? secret;
+  final String? uri;
+}
+
 /// Backed by `POST /api/v1/auth/login` etc. (spec §9.1).
 abstract class AuthRepository {
   Future<UserProfile> login(String email, String password);
@@ -29,6 +47,20 @@ abstract class AuthRepository {
   });
 
   Future<void> requestPasswordReset(String email);
+
+  /// Second step of a two-factor sign-in, or the confirmation step of
+  /// enrolment. Stores the upgraded session and returns the profile.
+  Future<UserProfile> verifyMfa(String factorId, String code);
+
+  /// Starts TOTP enrolment for the signed-in admin-level account.
+  Future<MfaEnrollment> enrollMfa();
+
+  /// Everything the backend holds about the signed-in user, as pretty JSON
+  /// (`GET /auth/me/export`).
+  Future<String> exportMyData();
+
+  /// Permanently deletes the signed-in account (`DELETE /auth/me`).
+  Future<void> deleteAccount();
 
   /// Signs in with Google (native/web picker via `google_sign_in`), then
   /// exchanges the ID token for a session via `POST /auth/google`. Returns
@@ -124,6 +156,29 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<String> exportMyData() async {
+    await Future.delayed(AppConstants.mockLatency);
+    return '{}';
+  }
+
+  @override
+  Future<UserProfile> verifyMfa(String factorId, String code) async {
+    await Future.delayed(AppConstants.mockLatency);
+    return _accounts['student@sun.ac.ug']!.profile;
+  }
+
+  @override
+  Future<MfaEnrollment> enrollMfa() async {
+    await Future.delayed(AppConstants.mockLatency);
+    return const MfaEnrollment(factorId: 'mock', secret: 'MOCKSECRET');
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    await Future.delayed(AppConstants.mockLatency);
+  }
+
+  @override
   Future<UserProfile?> loginWithGoogle() async {
     await Future.delayed(AppConstants.mockLatency);
     return _accounts['student@sun.ac.ug']!.profile;
@@ -149,6 +204,11 @@ class HttpAuthRepository implements AuthRepository {
       accessToken: data['access_token'] as String,
       refreshToken: data['refresh_token'] as String?,
     );
+    if (data['mfa_required'] == true) {
+      // Tokens are saved: the first-factor session is what authorises the
+      // follow-up verify call. Nothing else works until the code is checked.
+      throw MfaRequired(data['mfa_factor_id'] as String);
+    }
     return UserProfile.fromJson(data['user'] as Map<String, dynamic>);
   }
 
@@ -189,8 +249,59 @@ class HttpAuthRepository implements AuthRepository {
 
   @override
   Future<void> requestPasswordReset(String email) async {
-    // Not yet exposed by the backend (Supabase Auth has this built in —
-    // see backend/README.md) — no-op for now rather than a broken call.
+    try {
+      // Always 202, whether or not the address has an account.
+      await _dio.post('/auth/password-reset', data: {'email': email.trim()});
+    } on DioException catch (e) {
+      throw AuthException(mapDioError(e).message);
+    }
+  }
+
+  @override
+  Future<UserProfile> verifyMfa(String factorId, String code) async {
+    try {
+      final res = await _dio.post('/auth/mfa/verify', data: {
+        'factor_id': factorId,
+        'code': code.trim(),
+      });
+      return await _handleAuthResponse(res);
+    } on DioException catch (e) {
+      throw AuthException(mapDioError(e).message);
+    }
+  }
+
+  @override
+  Future<MfaEnrollment> enrollMfa() async {
+    try {
+      final res = await _dio.post('/auth/mfa/enroll');
+      final d = res.data as Map<String, dynamic>;
+      return MfaEnrollment(
+        factorId: d['factor_id'] as String,
+        secret: d['secret'] as String?,
+        uri: d['uri'] as String?,
+      );
+    } on DioException catch (e) {
+      throw AuthException(mapDioError(e).message);
+    }
+  }
+
+  @override
+  Future<String> exportMyData() async {
+    try {
+      final res = await _dio.get('/auth/me/export');
+      return const JsonEncoder.withIndent('  ').convert(res.data);
+    } on DioException catch (e) {
+      throw AuthException(mapDioError(e).message);
+    }
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete('/auth/me');
+    } on DioException catch (e) {
+      throw AuthException(mapDioError(e).message);
+    }
   }
 
   @override

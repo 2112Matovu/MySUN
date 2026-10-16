@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:mysun_app/providers/auth_provider.dart';
+import 'package:mysun_app/widgets/idle_logout.dart';
 
 /// Bottom-nav host (spec §4.3, §4.5). Home/Events/Services/Bookmarks are
 /// always visible; Publish (publishers) and Admin (admin/minor-admin) are
@@ -81,7 +82,7 @@ class MainShell extends ConsumerWidget {
 
     final selected = tabs.indexWhere((t) => t.branchIndex == navigationShell.currentIndex);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected < 0 ? 0 : selected,
@@ -89,6 +90,8 @@ class MainShell extends ConsumerWidget {
         destinations: [for (final t in tabs) t.destination],
       ),
     );
+    // Admin sessions time out after 30 idle minutes (NFR-SEC-09).
+    return role.isAdminLevel ? IdleLogout(child: scaffold) : scaffold;
   }
 }
 

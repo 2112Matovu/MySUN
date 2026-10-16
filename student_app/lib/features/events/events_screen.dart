@@ -46,6 +46,7 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                 suffixIcon: filter.query.isEmpty
                     ? null
                     : IconButton(
+                        tooltip: 'Clear search',
                         icon: const Icon(Icons.close),
                         onPressed: () {
                           _searchController.clear();

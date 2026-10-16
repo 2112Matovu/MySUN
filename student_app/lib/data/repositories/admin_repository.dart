@@ -15,6 +15,42 @@ abstract interface class AdminRepository {
   Future<UserProfile> updateRole(String userId, UserRole newRole);
 
   Future<AdminAnalytics> analytics();
+
+  /// Newest-first log of administrator actions (`GET /admin/audit`).
+  Future<List<AuditEntry>> auditLog({int limit = 100});
+
+  /// All users as CSV text (`GET /admin/users/export.csv`).
+  Future<String> exportUsersCsv();
+}
+
+class AuditEntry {
+  const AuditEntry({
+    required this.id,
+    required this.action,
+    required this.createdAt,
+    this.actorName,
+    this.targetType,
+    this.targetId,
+    this.detail = const {},
+  });
+
+  final String id;
+  final String action;
+  final DateTime createdAt;
+  final String? actorName;
+  final String? targetType;
+  final String? targetId;
+  final Map<String, dynamic> detail;
+
+  factory AuditEntry.fromJson(Map<String, dynamic> json) => AuditEntry(
+        id: json['id'] as String,
+        action: json['action'] as String,
+        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+        actorName: json['actor_name'] as String?,
+        targetType: json['target_type'] as String?,
+        targetId: json['target_id'] as String?,
+        detail: (json['detail'] as Map?)?.cast<String, dynamic>() ?? const {},
+      );
 }
 
 class MockAdminRepository implements AdminRepository {
@@ -96,6 +132,15 @@ class MockAdminRepository implements AdminRepository {
     await Future<void>.delayed(AppConstants.mockLatency);
     return AdminAnalytics.mock;
   }
+
+  @override
+  Future<List<AuditEntry>> auditLog({int limit = 100}) async => const [];
+
+  @override
+  Future<String> exportUsersCsv() async {
+    final rows = _directory.map((u) => '${u.id},${u.name},${u.email},${u.role.toJson()}');
+    return ['id,name,email,role', ...rows].join('\n');
+  }
 }
 
 class HttpAdminRepository implements AdminRepository {
@@ -133,6 +178,31 @@ class HttpAdminRepository implements AdminRepository {
     try {
       final res = await _dio.get('/admin/analytics');
       return AdminAnalytics.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<List<AuditEntry>> auditLog({int limit = 100}) async {
+    try {
+      final res = await _dio.get('/admin/audit', queryParameters: {'limit': limit});
+      return (res.data as List)
+          .map((e) => AuditEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<String> exportUsersCsv() async {
+    try {
+      final res = await _dio.get<String>(
+        '/admin/users/export.csv',
+        options: Options(responseType: ResponseType.plain),
+      );
+      return res.data ?? '';
     } on DioException catch (e) {
       throw mapDioError(e);
     }

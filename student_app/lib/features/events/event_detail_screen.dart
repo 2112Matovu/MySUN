@@ -97,6 +97,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 pinned: true,
                 actions: [
                   IconButton(
+                    tooltip: 'Bookmark',
                     icon: Icon(saved
                         ? Icons.bookmark
                         : Icons.bookmark_border_outlined),

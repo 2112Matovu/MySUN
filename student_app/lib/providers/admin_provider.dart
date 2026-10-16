@@ -4,6 +4,7 @@ import 'package:mysun_app/data/models/admin_analytics.dart';
 import 'package:mysun_app/data/models/publisher_submission.dart';
 import 'package:mysun_app/data/models/user_profile.dart';
 import 'package:mysun_app/data/models/user_role.dart';
+import 'package:mysun_app/data/repositories/admin_repository.dart';
 import 'package:mysun_app/providers/accommodation_providers.dart';
 import 'package:mysun_app/providers/announcements_provider.dart';
 import 'package:mysun_app/providers/events_provider.dart';
@@ -28,6 +29,11 @@ final adminUsersProvider =
 final adminAnalyticsProvider =
     FutureProvider.autoDispose<AdminAnalytics>((ref) async {
   return ref.watch(adminRepositoryProvider).analytics();
+});
+
+/// Administrator action log (Super Admin).
+final auditLogProvider = FutureProvider.autoDispose<List<AuditEntry>>((ref) async {
+  return ref.watch(adminRepositoryProvider).auditLog();
 });
 
 /// Removes a piece of live content (§5.1 "Content moderation" — remove-only,

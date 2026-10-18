@@ -13,13 +13,14 @@ class MySunApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final accent = ref.watch(accentColorProvider);
     ref.watch(pushBootstrapProvider);
 
     return MaterialApp.router(
       title: 'MySun',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(accent),
+      darkTheme: AppTheme.dark(accent),
       themeMode: themeMode,
       routerConfig: router,
     );

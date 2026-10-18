@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:mysun_app/core/constants/app_constants.dart';
-import 'package:mysun_app/core/theme/app_colors.dart';
 import 'package:mysun_app/providers/auth_provider.dart';
 
 /// §4.2 Login Screen. Role detection happens after a successful login —
@@ -119,8 +118,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(Icons.wb_sunny_rounded,
-                        size: 48, color: AppColors.brandSun),
+                    Icon(Icons.wb_sunny_rounded,
+                        size: 48, color: theme.colorScheme.primary),
                     const SizedBox(height: 12),
                     Text(AppConstants.appName,
                         textAlign: TextAlign.center,

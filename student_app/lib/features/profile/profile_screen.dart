@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mysun_app/core/constants/app_constants.dart';
 import 'package:mysun_app/core/constants/categories.dart';
+import 'package:mysun_app/core/theme/app_colors.dart';
 import 'package:mysun_app/data/models/notification_prefs.dart';
 import 'package:mysun_app/providers/auth_provider.dart';
 import 'package:mysun_app/providers/notification_prefs_provider.dart';
@@ -84,6 +85,12 @@ class ProfileScreen extends ConsumerWidget {
           _ThemeModeSelector(
             value: settings.themeMode,
             onChanged: settingsNotifier.setThemeMode,
+          ),
+          const Divider(height: 24),
+          const _SectionTitle('Accent colour'),
+          _AccentPicker(
+            value: settings.accent,
+            onChanged: settingsNotifier.setAccent,
           ),
           const Divider(height: 24),
           const _SectionTitle('Notifications'),
@@ -320,6 +327,198 @@ class _Pill extends StatelessWidget {
 
 /// Theme-mode selector: a [RadioGroup] ancestor manages the shared value so
 /// each [RadioListTile] only needs its own `value`.
+/// Colours offered as one-tap accents. The first entry is MySun's default.
+const _accentPresets = <(String, Color)>[
+  ('Sun', AppColors.brandSun),
+  ('Sky', Color(0xFF2F80ED)),
+  ('Emerald', Color(0xFF1E9E5A)),
+  ('Teal', Color(0xFF00A3A3)),
+  ('Violet', Color(0xFF7C4DFF)),
+  ('Rose', Color(0xFFE91E63)),
+  ('Crimson', Color(0xFFD32F2F)),
+  ('Slate', Color(0xFF455A64)),
+];
+
+/// Lets the user recolour the whole app: preset swatches, a custom colour
+/// from sliders, and a reset to the default.
+class _AccentPicker extends StatelessWidget {
+  const _AccentPicker({required this.value, required this.onChanged});
+
+  final Color? value;
+  final ValueChanged<Color?> onChanged;
+
+  bool _isSelected(Color c) =>
+      (value ?? AppColors.brandSun).toARGB32() == c.toARGB32();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final custom = value != null && !_accentPresets.any((p) => _isSelected(p.$2));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Pick the colour you want the app to use for buttons, highlights and tabs.',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final (name, color) in _accentPresets)
+                _Swatch(
+                  color: color,
+                  label: name,
+                  selected: _isSelected(color),
+                  onTap: () => onChanged(color == AppColors.brandSun ? null : color),
+                ),
+              _Swatch(
+                color: custom ? value! : theme.colorScheme.surfaceContainerHighest,
+                label: 'Custom',
+                selected: custom,
+                icon: Icons.colorize_outlined,
+                onTap: () async {
+                  final picked = await showDialog<Color>(
+                    context: context,
+                    builder: (_) => _CustomAccentDialog(initial: value ?? AppColors.brandSun),
+                  );
+                  if (picked != null) onChanged(picked);
+                },
+              ),
+            ],
+          ),
+          if (value != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => onChanged(null),
+                icon: const Icon(Icons.restart_alt),
+                label: const Text('Back to the default colour'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Swatch extends StatelessWidget {
+  const _Swatch({
+    required this.color,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  final Color color;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onColor =
+        ThemeData.estimateBrightnessForColor(color) == Brightness.dark ? Colors.white : Colors.black87;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$label accent colour',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: SizedBox(
+          width: 60,
+          child: Column(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? theme.colorScheme.onSurface : theme.colorScheme.outlineVariant,
+                    width: selected ? 3 : 1,
+                  ),
+                ),
+                child: selected
+                    ? Icon(Icons.check, color: onColor)
+                    : (icon == null ? null : Icon(icon, color: onColor, size: 20)),
+              ),
+              const SizedBox(height: 4),
+              Text(label, style: theme.textTheme.labelSmall, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Hue / saturation / brightness sliders with a live preview.
+class _CustomAccentDialog extends StatefulWidget {
+  const _CustomAccentDialog({required this.initial});
+  final Color initial;
+
+  @override
+  State<_CustomAccentDialog> createState() => _CustomAccentDialogState();
+}
+
+class _CustomAccentDialogState extends State<_CustomAccentDialog> {
+  late HSVColor _hsv = HSVColor.fromColor(widget.initial);
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _hsv.toColor();
+    return AlertDialog(
+      title: const Text('Custom colour'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 56,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
+          ),
+          const SizedBox(height: 12),
+          _slider('Colour', _hsv.hue, 360, (v) => _hsv = _hsv.withHue(v)),
+          _slider('Richness', _hsv.saturation, 1, (v) => _hsv = _hsv.withSaturation(v)),
+          _slider('Brightness', _hsv.value, 1, (v) => _hsv = _hsv.withValue(v)),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size(96, 44)),
+          onPressed: () => Navigator.of(context).pop(color),
+          child: const Text('Use this'),
+        ),
+      ],
+    );
+  }
+
+  Widget _slider(String label, double value, double max, void Function(double) set) {
+    return Row(
+      children: [
+        SizedBox(width: 78, child: Text(label)),
+        Expanded(
+          child: Slider(
+            value: value.clamp(0, max),
+            max: max,
+            semanticFormatterCallback: (_) => label,
+            onChanged: (v) => setState(() => set(v)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ThemeModeSelector extends StatelessWidget {
   const _ThemeModeSelector({
     required this.value,

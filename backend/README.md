@@ -89,6 +89,128 @@ to ~1 minute while it wakes back up. Fine for a campus app's usage
 pattern; upgrade to a paid Render plan later if that cold start becomes a
 problem.
 
+## Deploying to your own Python server (venv + systemd + nginx)
+
+For any Linux server (VPS, or a panel host such as CloudPanel) where the
+backend runs as a normal Python process in a virtual environment, with nginx
+in front for HTTPS. Commands assume Ubuntu/Debian.
+
+**Before you start**
+- Python 3.12 or newer, a domain pointing at the server, and sudo access.
+- **Run every Supabase migration first**, `supabase/migrations/0001` to
+  `0006`, in order, in the Supabase **SQL Editor**. A missing migration shows
+  up as HTTP 500 on data routes and a log line like
+  `column announcements.publish_at does not exist` (that one is `0005`). The
+  files are not safe to run twice, so check what exists before re-running.
+
+**1. Prepare the server**
+```
+sudo apt update && sudo apt install -y python3-venv python3-pip git nginx
+sudo adduser --disabled-password --gecos "" mysun
+sudo -iu mysun
+```
+
+**2. Get the code and create the venv**
+```
+git clone https://github.com/2112Matovu/MySUN.git
+cd MySUN/backend
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt gunicorn
+```
+
+**3. Create `.env`** (never commit it)
+```
+cp .env.example .env && nano .env && chmod 600 .env
+```
+Set `APP_ENV=production`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS=https://<your-domain>`,
+`CRON_SECRET` (a long random string) and `ADMIN_REQUIRE_2FA=false`.
+`FCM_SERVICE_ACCOUNT_JSON` is optional (no push notifications without it).
+
+**4. Try it by hand**
+```
+venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8090
+curl http://127.0.0.1:8090/health      # {"status":"ok",...}
+```
+
+**5. Keep it running with systemd.** As a sudo user, create
+`/etc/systemd/system/mysun.service`:
+```
+[Unit]
+Description=MySun API
+After=network.target
+
+[Service]
+User=mysun
+WorkingDirectory=/home/mysun/MySUN/backend
+ExecStart=/home/mysun/MySUN/backend/venv/bin/gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 127.0.0.1:8090 --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+```
+sudo systemctl daemon-reload && sudo systemctl enable --now mysun
+journalctl -u mysun -f          # logs
+```
+
+**6. nginx** (`/etc/nginx/sites-available/mysun`, then symlink into
+`sites-enabled`, `sudo nginx -t && sudo systemctl reload nginx`):
+```
+server {
+    listen 80;
+    server_name api.yourdomain.com;
+    location / {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**7. HTTPS and firewall**
+```
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d api.yourdomain.com
+sudo ufw allow OpenSSH && sudo ufw allow 'Nginx Full' && sudo ufw enable
+```
+Check `https://api.yourdomain.com/health`. Port 8090 stays closed to the
+outside; only nginx talks to it.
+
+**8. Scheduled jobs** (`crontab -e` as the `mysun` user)
+```
+*/5 * * * * curl -s -X POST -H "X-Cron-Secret: YOUR_SECRET" https://api.yourdomain.com/api/v1/internal/run-reminders
+0 3 1 * * curl -s -X POST -H "X-Cron-Secret: YOUR_SECRET" https://api.yourdomain.com/api/v1/internal/purge-inactive
+```
+
+**9. Update later**
+```
+cd ~/MySUN && git pull && cd backend
+venv/bin/pip install -r requirements.txt
+sudo systemctl restart mysun
+```
+
+**10. Point the app at it**
+```
+flutter build apk --release --dart-define=API_BASE_URL=https://api.yourdomain.com/api/v1
+```
+The URL must end in `/api/v1`.
+
+### Panel hosts with no SSH (CloudPanel and similar)
+
+If the only way to run commands is the panel's **Cron Jobs** tab, upload
+`app/`, `requirements.txt`, `start.sh` and your `.env` into one folder
+(File Manager), set the site's **App Port** to `8090` in the panel's Python
+settings, and add one cron job, every minute:
+```
+sh /path/to/that/folder/start.sh
+```
+`start.sh` installs the libraries once (log: `setup.log`), then starts the
+API on port 8090 and restarts it if it stops (log: `run.log`). Keep the job
+in place; it is what keeps the API alive.
+
 ## Architecture
 
 - **Supabase Postgres** — schema in `supabase/migrations/`. Row Level

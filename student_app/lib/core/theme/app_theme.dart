@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 
 import 'package:mysun_app/core/theme/app_colors.dart';
 
-/// Material 3 themes for MySun. One seed, two brightnesses.
+/// Material 3 themes for MySun. One seed (the user's accent colour, MySun
+/// amber by default), two brightnesses.
 abstract final class AppTheme {
-  static ThemeData light() => _build(Brightness.light);
-  static ThemeData dark() => _build(Brightness.dark);
+  static ThemeData light([Color seed = AppColors.brandSun]) =>
+      _build(Brightness.light, seed);
+  static ThemeData dark([Color seed = AppColors.brandSun]) =>
+      _build(Brightness.dark, seed);
 
-  static ThemeData _build(Brightness brightness) {
+  static ThemeData _build(Brightness brightness, Color seed) {
     final scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.brandSun,
+      seedColor: seed,
       brightness: brightness,
     );
     final isDark = brightness == Brightness.dark;

@@ -9,7 +9,10 @@ import 'package:mysun_app/providers/auth_provider.dart';
 import 'package:mysun_app/providers/events_provider.dart';
 import 'package:mysun_app/providers/notifications_provider.dart';
 import 'package:mysun_app/providers/transport_providers.dart';
+import 'package:mysun_app/data/models/announcement.dart';
+import 'package:mysun_app/data/models/event.dart';
 import 'package:mysun_app/widgets/announcement_card.dart';
+import 'package:mysun_app/widgets/event_card.dart';
 import 'package:mysun_app/widgets/category_chips.dart';
 import 'package:mysun_app/widgets/state_views.dart';
 
@@ -28,15 +31,19 @@ class HomeScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final user = ref.watch(currentUserProvider);
     final category = ref.watch(announcementCategoryProvider);
+    final showAll = category == 'All';
     final announcements = ref.watch(announcementsProvider);
+    final feed = ref.watch(campusFeedProvider);
 
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(announcementsProvider);
+          ref.invalidate(campusFeedProvider);
           ref.invalidate(nextEventProvider);
           ref.invalidate(nextBusProvider);
-          await ref.read(announcementsProvider.future);
+          await ref.read(
+              (showAll ? campusFeedProvider : announcementsProvider).future);
         },
         child: CustomScrollView(
           slivers: [
@@ -112,35 +119,71 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 14)),
-            announcements.when(
-              loading: () => const SliverFillRemaining(
-                hasScrollBody: false,
-                child: LoadingView(),
-              ),
-              error: (e, _) => SliverFillRemaining(
-                hasScrollBody: false,
-                child: ErrorView(
-                  message: '$e',
-                  onRetry: () => ref.invalidate(announcementsProvider),
+            if (showAll)
+              feed.when(
+                loading: () => const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: LoadingView(),
                 ),
-              ),
-              data: (items) {
-                if (items.isEmpty) {
-                  return const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyState(
-                      icon: Icons.campaign_outlined,
-                      title: 'No announcements here',
-                      message: 'Try another category.',
-                    ),
+                error: (e, _) => SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: ErrorView(
+                    message: '$e',
+                    onRetry: () => ref.invalidate(campusFeedProvider),
+                  ),
+                ),
+                data: (items) {
+                  if (items.isEmpty) {
+                    return const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: EmptyState(
+                        icon: Icons.campaign_outlined,
+                        title: 'Nothing on the feed yet',
+                        message: 'New announcements and events show up here.',
+                      ),
+                    );
+                  }
+                  return SliverList.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, i) {
+                      final item = items[i];
+                      return item is Event
+                          ? EventCard(item)
+                          : AnnouncementCard(item as Announcement);
+                    },
                   );
-                }
-                return SliverList.builder(
-                  itemCount: items.length,
-                  itemBuilder: (context, i) => AnnouncementCard(items[i]),
-                );
-              },
-            ),
+                },
+              )
+            else
+              announcements.when(
+                loading: () => const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: LoadingView(),
+                ),
+                error: (e, _) => SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: ErrorView(
+                    message: '$e',
+                    onRetry: () => ref.invalidate(announcementsProvider),
+                  ),
+                ),
+                data: (items) {
+                  if (items.isEmpty) {
+                    return const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: EmptyState(
+                        icon: Icons.campaign_outlined,
+                        title: 'No announcements here',
+                        message: 'Try another category.',
+                      ),
+                    );
+                  }
+                  return SliverList.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, i) => AnnouncementCard(items[i]),
+                  );
+                },
+              ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
@@ -172,8 +215,7 @@ class _QuickStatusRow extends ConsumerWidget {
               orElse: () => '…',
             ),
             sub: nextEvent.maybeWhen(
-              data: (e) =>
-                  e == null ? '' : DateFmt.countdown(e.countdown),
+              data: (e) => e == null ? '' : DateFmt.countdown(e.countdown),
               orElse: () => '',
             ),
             onTap: () => context.push('/events'),

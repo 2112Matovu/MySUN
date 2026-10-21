@@ -5,6 +5,8 @@ import { api } from "@/lib/server-api";
 import { clearSession, setSession } from "@/lib/session";
 import { safeNext, type User } from "@/lib/auth";
 import { homeFor } from "@/lib/roles";
+import { sanitize, sanitizeEmail } from "@/lib/sanitize";
+import { firstError, forgotSchema, loginSchema, signupSchema } from "@/lib/validation";
 
 export type FormState = { error?: string; notice?: string; email?: string } | undefined;
 
@@ -17,14 +19,13 @@ type AuthResponse = {
 };
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function login(_: FormState, form: FormData): Promise<FormState> {
-  const email = str(form, "email");
-  const password = String(form.get("password") ?? "");
+  const rawEmail = sanitizeEmail(form.get("email"));
   const next = safeNext(form.get("next"));
-  if (!EMAIL.test(email)) return { error: "Enter a valid email address.", email };
-  if (!password) return { error: "Enter your password.", email };
+  const parsed = loginSchema.safeParse({ email: rawEmail, password: String(form.get("password") ?? "") });
+  if (!parsed.success) return { error: firstError(parsed.error), email: rawEmail };
+  const { email, password } = parsed.data;
 
   const r = await api<AuthResponse>("/auth/login", { method: "POST", body: { email, password }, auth: false });
   if (!r.ok) return { error: r.message, email };
@@ -48,12 +49,14 @@ export async function verifyMfa(_: FormState, form: FormData): Promise<FormState
 }
 
 export async function signup(_: FormState, form: FormData): Promise<FormState> {
-  const name = str(form, "name");
-  const email = str(form, "email");
-  const password = String(form.get("password") ?? "");
-  if (!name) return { error: "Enter your full name.", email };
-  if (!EMAIL.test(email)) return { error: "Enter a valid email address.", email };
-  if (password.length < 8) return { error: "Use at least 8 characters for your password.", email };
+  const rawEmail = sanitizeEmail(form.get("email"));
+  const parsed = signupSchema.safeParse({
+    name: sanitize(form.get("name")),
+    email: rawEmail,
+    password: String(form.get("password") ?? ""),
+  });
+  if (!parsed.success) return { error: firstError(parsed.error), email: rawEmail };
+  const { name, email, password } = parsed.data;
 
   const r = await api<AuthResponse>("/auth/signup", { method: "POST", body: { name, email, password }, auth: false });
   if (!r.ok) {
@@ -66,8 +69,10 @@ export async function signup(_: FormState, form: FormData): Promise<FormState> {
 }
 
 export async function requestPasswordReset(_: FormState, form: FormData): Promise<FormState> {
-  const email = str(form, "email");
-  if (!EMAIL.test(email)) return { error: "Enter a valid email address.", email };
+  const rawEmail = sanitizeEmail(form.get("email"));
+  const parsed = forgotSchema.safeParse({ email: rawEmail });
+  if (!parsed.success) return { error: firstError(parsed.error), email: rawEmail };
+  const { email } = parsed.data;
   const r = await api("/auth/password-reset", { method: "POST", body: { email }, auth: false });
   if (!r.ok) return { error: r.message, email };
   return { notice: `If an account exists for ${email}, a reset link is on its way.`, email };

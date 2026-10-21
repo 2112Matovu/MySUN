@@ -1,0 +1,127 @@
+@import "tailwindcss";
+@import "@fontsource-variable/bricolage-grotesque/standard.css";
+
+/*
+  MySun palette. The four ray colours come straight from the logo and each one
+  belongs to a section of the site, so a colour always means the same thing.
+*/
+@theme {
+  --color-night: #0d1b35;
+  --color-night-2: #162a4f;
+  --color-chalk: #f5f7f4;
+  --color-paper: #ffffff;
+  --color-ink: #1b2740;
+  --color-mute: #5b6780;
+  --color-line: #dce2dd;
+
+  --color-gold: #f5b318;
+  --color-gold-deep: #8a5d00;
+  --color-blue: #0a4a8f;
+  --color-red: #d9453b;
+  --color-red-deep: #b3302a;
+  --color-teal: #11857c;
+  --color-teal-deep: #0d6a63;
+
+  --font-sans: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-chalk);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-night);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-blue);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.on-dark :focus-visible,
+[data-dark] :focus-visible {
+  outline-color: var(--color-gold);
+}
+
+/* Display type: condensed width, tight tracking. Used for headlines and numerals. */
+.display {
+  font-stretch: 84%;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+.display-soft {
+  font-stretch: 88%;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+.prose-tight {
+  max-width: 62ch;
+  text-wrap: pretty;
+}
+
+/* Hero sky layers crossfade between phases of the Soroti day. */
+.sky {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1800ms ease;
+}
+.sky[data-on="true"] {
+  opacity: 1;
+}
+.sky-dawn {
+  background: linear-gradient(180deg, #2c4a80 0%, #b86a85 48%, #f6b36f 82%, #f9d796 100%);
+}
+.sky-day {
+  background: linear-gradient(180deg, #6fb4e6 0%, #b5dbf3 52%, #e8f3f7 100%);
+}
+.sky-dusk {
+  background: linear-gradient(180deg, #2e2662 0%, #a2436f 46%, #ee8a52 80%, #f8c26a 100%);
+}
+.sky-night {
+  background:
+    radial-gradient(1.2px 1.2px at 12% 18%, #fff 60%, transparent 61%),
+    radial-gradient(1px 1px at 27% 34%, #fff 60%, transparent 61%),
+    radial-gradient(1.4px 1.4px at 41% 12%, #fff 60%, transparent 61%),
+    radial-gradient(1px 1px at 58% 28%, #fff 60%, transparent 61%),
+    radial-gradient(1.3px 1.3px at 71% 15%, #fff 60%, transparent 61%),
+    radial-gradient(1px 1px at 83% 38%, #fff 60%, transparent 61%),
+    radial-gradient(1.2px 1.2px at 92% 20%, #fff 60%, transparent 61%),
+    radial-gradient(1px 1px at 6% 44%, #fff 60%, transparent 61%),
+    radial-gradient(1px 1px at 49% 46%, #fff 60%, transparent 61%),
+    linear-gradient(180deg, #070f21 0%, #0d1b35 60%, #162a4f 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .sky {
+    transition: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
